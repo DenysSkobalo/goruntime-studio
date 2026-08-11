@@ -1,3 +1,129 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  :root {
+    --bg-grid-color: rgba(24, 24, 27, 0.05);
+  }
+  .dark {
+    --bg-grid-color: rgba(255, 255, 255, 0.04);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #ffffff;
+    color: #09090b;
+    font-family: var(--font-sans);
+    background-image: radial-gradient(var(--bg-grid-color) 1px, transparent 1px);
+    background-size: 24px 24px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark body {
+    background-color: #09090b;
+    color: #f4f4f5;
+  }
+
+  ::selection {
+    background: #18181b;
+    color: #ffffff;
+  }
+  .dark ::selection {
+    background: #f4f4f5;
+    color: #09090b;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #e4e4e7;
+    border-radius: 999px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #27272a;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+  }
+}
+
+/* ── Glow Card ── */
+.glow-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid #e4e4e7;
+  background-color: #ffffff;
+  transition: all 0.2s ease;
+}
+.dark .glow-card {
+  border-color: #27272a;
+  background-color: #121215;
+}
+.glow-card:hover {
+  border-color: #d4d4d8;
+}
+.dark .glow-card:hover {
+  border-color: #3f3f46;
+}
+
+/* ── Inner Card ── */
+.inner-card {
+  border-radius: 0.75rem;
+  border: 1px solid #f4f4f5;
+  background-color: #fafafa;
+}
+.dark .inner-card {
+  border-color: #18181b;
+  background-color: #09090b;
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.4); }
+  50%      { box-shadow: 0 0 0 8px rgb(16 185 129 / 0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slideInRight 0.2s ease-out both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ── Data flow animation for Canvas ── */
+@keyframes data-flow {
+  0%   { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
