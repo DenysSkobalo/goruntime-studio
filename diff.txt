@@ -1,0 +1,742 @@
+diff --git a/src/App.svelte b/src/App.svelte
+index 86415ee..5033902 100644
+--- a/src/App.svelte
++++ b/src/App.svelte
+@@ -1,18 +1,31 @@
+ <script lang="ts">
+   import { onMount } from 'svelte';
+-  import Navigation from './lib/shared/Navigation.svelte';
++  import './app.css';
++  import Workspace from './lib/workspace/Workspace.svelte';
++  import DocsView from './lib/docs/DocsView.svelte';
+   import SettingsModal from './lib/shared/SettingsModal.svelte';
+-  import InspectorView from './lib/inspector/InspectorView.svelte';
+-  import CanvasView from './lib/canvas/CanvasView.svelte';
+   import { i18n } from './lib/i18n/i18n.svelte';
+   import { themeStore } from './lib/theme/theme.svelte';
+ 
+-  type Mode = 'inspector' | 'canvas';
+-  let activeMode = $state<Mode>('inspector');
++  let currentRoute = $state<'workspace' | 'docs'>('workspace');
++
++  function updateRoute() {
++    const path = window.location.pathname;
++    const hash = window.location.hash;
++    if (path === '/docs' || hash.startsWith('#docs')) {
++      currentRoute = 'docs';
++    } else {
++      currentRoute = 'workspace';
++    }
++  }
+ 
+   onMount(() => {
+     document.documentElement.lang = i18n.lang;
+     themeStore.sync();
++    updateRoute();
++
++    window.addEventListener('popstate', updateRoute);
++    window.addEventListener('hashchange', updateRoute);
+ 
+     const mql = window.matchMedia('(prefers-color-scheme: dark)');
+     const handler = () => {
+@@ -21,24 +34,24 @@
+       }
+     };
+     mql.addEventListener('change', handler);
+-    return () => mql.removeEventListener('change', handler);
++
++    return () => {
++      window.removeEventListener('popstate', updateRoute);
++      window.removeEventListener('hashchange', updateRoute);
++      mql.removeEventListener('change', handler);
++    };
+   });
++
++  function navigateToWorkspace() {
++    window.history.pushState({}, '', '/');
++    currentRoute = 'workspace';
++  }
+ </script>
+ 
+-<main class="min-h-screen flex flex-col">
+-  <Navigation bind:activeMode />
+-
+-  <SettingsModal />
+-
+-  <div class="flex-1 p-4 md:p-6 max-w-5xl mx-auto w-full">
+-    {#key activeMode}
+-      <div class="animate-fade-in">
+-        {#if activeMode === 'inspector'}
+-          <InspectorView />
+-        {:else}
+-          <CanvasView />
+-        {/if}
+-      </div>
+-    {/key}
+-  </div>
+-</main>
++{#if currentRoute === 'docs'}
++  <DocsView onBack={navigateToWorkspace} />
++{:else}
++  <Workspace />
++{/if}
++
++<SettingsModal />
+\ No newline at end of file
+diff --git a/src/app.css b/src/app.css
+index 13a60c7..ac8afb5 100644
+--- a/src/app.css
++++ b/src/app.css
+@@ -61,9 +61,19 @@
+   ::-webkit-scrollbar-thumb:hover {
+     background: #a1a1aa;
+   }
++
++  button:focus,
++  button:focus-visible,
++  [role="button"]:focus,
++  [role="button"]:focus-visible,
++  [tabindex]:focus,
++  [tabindex]:focus-visible {
++    outline: none !important;
++    box-shadow: none;
++    -webkit-tap-highlight-color: transparent;
++  }
+ }
+ 
+-/* ── Glow Card ── */
+ .glow-card {
+   position: relative;
+   overflow: hidden;
+@@ -83,7 +93,6 @@
+   border-color: #3f3f46;
+ }
+ 
+-/* ── Inner Card ── */
+ .inner-card {
+   border-radius: 0.75rem;
+   border: 1px solid #f4f4f5;
+@@ -126,4 +135,4 @@
+ @keyframes data-flow {
+   0%   { stroke-dashoffset: 24; }
+   100% { stroke-dashoffset: 0; }
+-}
++}
+\ No newline at end of file
+diff --git a/src/lib/canvas/CanvasView.svelte b/src/lib/canvas/CanvasView.svelte
+index 8dbafc7..12a8f97 100644
+--- a/src/lib/canvas/CanvasView.svelte
++++ b/src/lib/canvas/CanvasView.svelte
+@@ -1,28 +1,54 @@
+ <script lang="ts">
+-  import { Network, Plus, Play } from 'lucide-svelte';
++  import { Network, Play, Square, Trash2 } from 'lucide-svelte';
++  import { canvasStore } from './state/canvas.svelte';
++  import CanvasViewport from './CanvasViewport.svelte';
++
++  function handleSimulate() {
++    canvasStore.isSimulating = !canvasStore.isSimulating;
++  }
++
++  function handleClear() {
++    canvasStore.clear();
++  }
+ </script>
+ 
+-<div class="mx-auto max-w-6xl h-[calc(100vh-8rem)] flex flex-col gap-4">
+-  <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800 font-mono text-xs">
+-    <div class="flex items-center gap-2 text-slate-300">
+-	  <Network class="h-4 w-4 text-purple-400" />
+-	  <span class="font-bold text-white">GoRuntime Studio Canvas</span> (Node Graph Builder)
+-	</div>
++<div class="h-full w-full flex flex-col">
++  <!-- Toolbar -->
++  <div class="shrink-0 flex items-center justify-between bg-zinc-900/80 p-3 rounded-xl border border-zinc-800 font-mono text-xs m-4 mb-0">
++    <div class="flex items-center gap-2 text-zinc-300">
++      <Network class="h-4 w-4 text-purple-400" />
++      <span class="font-bold text-white">GoRuntime Studio Canvas</span>
++      <span class="text-zinc-500 hidden sm:inline">({canvasStore.nodes.length} nodes, {canvasStore.edges.length} edges)</span>
++    </div>
+     <div class="flex items-center gap-2">
+-      <button class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold transition">
+-        <Plus class="h-3.5 w-3.5" /> Add Node
+-      </button>
+-      <button class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+-        <Play class="h-3.5 w-3.5" /> Simulate Graph
++      {#if canvasStore.activeTool === 'connect'}
++        <span class="px-2 py-1 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 text-[10px] font-bold animate-pulse">
++          Connect Mode
++        </span>
++      {/if}
++      {#if canvasStore.nodes.length > 0}
++        <button
++          onclick={handleClear}
++          class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition text-[11px]"
++        >
++          <Trash2 class="h-3 w-3" /> Clear
++        </button>
++      {/if}
++      <button
++        onclick={handleSimulate}
++        class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg {canvasStore.isSimulating ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-semibold transition"
++      >
++        {#if canvasStore.isSimulating}
++          <Square class="h-3 w-3" /> Stop
++        {:else}
++          <Play class="h-3.5 w-3.5" /> Simulate
++        {/if}
+       </button>
+     </div>
+   </div>
+ 
+-  <div class="flex-1 rounded-xl border border-dashed border-slate-800 bg-slate-950/50 flex flex-col items-center justify-center p-8 text-center">
+-    <Network class="h-12 w-12 text-slate-700 mb-3 animate-pulse" />
+-    <h3 class="font-mono text-base font-bold text-slate-300">Canvas Editor Initialized</h3>
+-    <p class="font-mono text-xs text-slate-500 max-w-md mt-1">
+-      Drag-and-drop node graph engine (`@xyflow/svelte`) will be mounted here to construct visual goroutines and channel topographies.
+-    </p>
++  <!-- Viewport -->
++  <div class="flex-1 m-4 mt-3 rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 overflow-hidden relative">
++    <CanvasViewport />
+   </div>
+-</div>
++</div>
+\ No newline at end of file
+diff --git a/src/lib/canvas/state/canvas.svelte.ts b/src/lib/canvas/state/canvas.svelte.ts
+index bf4ecae..9979e15 100644
+--- a/src/lib/canvas/state/canvas.svelte.ts
++++ b/src/lib/canvas/state/canvas.svelte.ts
+@@ -1,18 +1,222 @@
+-import type { BaseCanvasNode, CanvasEdge } from '../types/nodes';
+-import { createInitialSnapshot } from '../../engine/core';
+-import type { RuntimeSnapshot } from '../../engine/types';
++import type { CanvasNode, CanvasEdge, CanvasNodeType } from '../types/nodes';
++
++const typeCounters: Record<CanvasNodeType, number> = {
++  goroutine: 0,
++  channel: 0,
++  mutex: 0,
++  waitgroup: 0,
++  select: 0,
++};
++
++export type CanvasTool = 'pointer' | 'connect' | CanvasNodeType;
++
++export function isValidConnection(srcType: CanvasNodeType, tgtType: CanvasNodeType): boolean {
++  if (srcType === 'mutex' || tgtType === 'mutex') {
++    return (srcType === 'goroutine' && tgtType === 'mutex') || (srcType === 'mutex' && tgtType === 'goroutine');
++  }
++  if (srcType === 'waitgroup' || tgtType === 'waitgroup') {
++    return (srcType === 'goroutine' && tgtType === 'waitgroup') || (srcType === 'waitgroup' && tgtType === 'goroutine');
++  }
++  if (srcType === 'select' || tgtType === 'select') {
++    const allowed = ['goroutine', 'channel'];
++    return allowed.includes(srcType) && allowed.includes(tgtType) && srcType !== tgtType;
++  }
++  if (srcType === 'channel' && tgtType === 'channel') {
++    return false;
++  }
++  return true;
++}
++
++export type ExtendedCanvasEdge = CanvasEdge & {
++  source: string;
++  target: string;
++};
+ 
+ class CanvasStore {
+-  nodes = $state<BaseCanvasNode[]>([]);
+   edges = $state<CanvasEdge[]>([]);
++  nodes = $state<CanvasNode[]>([]);
+   selectedNodeId = $state<string | null>(null);
++  selectedEdgeId = $state<string | null>(null);
++  activeTool = $state<CanvasTool>('pointer');
++  isSimulating = $state(false);
++
++  setTool(tool: CanvasTool) {
++    this.activeTool = tool;
++    if (tool !== 'pointer' && tool !== 'connect') {
++      this.selectedNodeId = null;
++      this.selectedEdgeId = null;
++    }
++  }
++
++  addNode(type: CanvasNodeType, position: { x: number; y: number }, label?: string): CanvasNode {
++    typeCounters[type]++;
++    const currentIndex = typeCounters[type];
++    const id = `${type}-${currentIndex}`;
++    const nodeLabel = label || `${type}-${currentIndex}`;
++
++    const base = {
++      id,
++      type,
++      position: { ...position },
++      label: nodeLabel,
++    };
++
++    let node: CanvasNode;
++    switch (type) {
++      case 'goroutine':
++        node = { ...base, type: 'goroutine', goid: currentIndex, status: '_Grunnable', instructions: [] } as CanvasNode;
++        break;
++      case 'channel':
++        node = { ...base, type: 'channel', capacity: 2, values: [], closed: false } as CanvasNode;
++        break;
++      case 'mutex':
++        node = { ...base, type: 'mutex', locked: false, starving: false, waitersCount: 0 } as CanvasNode;
++        break;
++      case 'waitgroup':
++        node = { ...base, type: 'waitgroup', counter: 0, waiterCount: 0 } as CanvasNode;
++        break;
++      case 'select':
++        node = { ...base, type: 'select', cases: [] } as CanvasNode;
++        break;
++      default:
++        throw new Error(`Unknown node type: ${type}`);
++    }
++
++    this.nodes = [...this.nodes, node];
++    this.selectNode(id);
++    return node;
++  }
++
++  removeNode(id: string) {
++    this.nodes = this.nodes.filter(n => n.id !== id);
++    this.edges = this.edges.filter(
++      e => e.sourceNodeId !== id && e.targetNodeId !== id && (e as any).source !== id && (e as any).target !== id
++    );
++    if (this.selectedNodeId === id) this.selectedNodeId = null;
++  }
++
++  updatePosition(id: string, pos: { x: number; y: number }) {
++    this.nodes = this.nodes.map(n => (n.id === id ? { ...n, position: pos } : n));
++  }
++
++  selectNode(id: string | null) {
++    this.selectedNodeId = id;
++    if (id !== null) {
++      this.selectedEdgeId = null;
++    }
++  }
++
++  selectEdge(id: string | null) {
++    this.selectedEdgeId = id;
++    if (id !== null) {
++      this.selectedNodeId = null;
++    }
++  }
++
++  addEdge(sourceId: string, targetId: string, kind?: CanvasEdge['kind']): boolean {
++    if (sourceId === targetId) return false;
++
++    const src = this.getNode(sourceId);
++    const tgt = this.getNode(targetId);
++    if (!src || !tgt) return false;
++
++    if (!isValidConnection(src.type, tgt.type)) {
++      return false;
++    }
++
++    const exists = this.edges.some(
++      e =>
++        (e.sourceNodeId === sourceId && e.targetNodeId === targetId) ||
++        ((e as any).source === sourceId && (e as any).target === targetId)
++    );
++    if (exists) return false;
++
++    let finalKind = kind;
++    if (!finalKind) {
++      if (tgt.type === 'mutex') finalKind = 'sync_lock';
++      else if (tgt.type === 'waitgroup') finalKind = 'context_signal';
++      else finalKind = 'data_flow';
++    }
++
++    const edgeId = `edge-${this.edges.length + 1}`;
++    const edge: CanvasEdge = {
++      id: edgeId,
++      sourceNodeId: sourceId,
++      targetNodeId: targetId,
++      source: sourceId,
++      target: targetId,
++      kind: finalKind,
++    } as CanvasEdge;
++
++    this.edges = [...this.edges, edge];
++    this.selectEdge(edge.id);
++    return true;
++  }
++
++  reconnectEdge(edgeId: string, end: 'source' | 'target', newNodeId: string): boolean {
++    const edge = this.edges.find(e => e.id === edgeId);
++    if (!edge) return false;
++
++    const currentSource = edge.sourceNodeId || (edge as any).source;
++    const currentTarget = edge.targetNodeId || (edge as any).target;
++
++    const sourceId = end === 'source' ? newNodeId : currentSource;
++    const targetId = end === 'target' ? newNodeId : currentTarget;
++
++    if (sourceId === targetId) return false;
++
++    const src = this.getNode(sourceId);
++    const tgt = this.getNode(targetId);
++    if (!src || !tgt) return false;
++
++    if (!isValidConnection(src.type, tgt.type)) return false;
++
++    this.edges = this.edges.map(e => {
++      if (e.id !== edgeId) return e;
++      return {
++        ...e,
++        sourceNodeId: sourceId,
++        targetNodeId: targetId,
++        source: sourceId,
++        target: targetId,
++      };
++    });
++    this.selectEdge(edgeId);
++    return true;
++  }
++
++  getEdge(id: string | null): ExtendedCanvasEdge | null {
++    if (!id) return null;
++    const edge = this.edges.find(e => e.id === id);
++    if (!edge) return null;
++
++    return {
++      ...edge,
++      source: (edge as any).source || edge.sourceNodeId,
++      target: (edge as any).target || edge.targetNodeId,
++    };
++  }
++
++  getNode(id: string | null): CanvasNode | null {
++    if (!id) return null;
++    return this.nodes.find(node => node.id === id) ?? null;
++  }
++
++  removeEdge(id: string) {
++    this.edges = this.edges.filter(e => e.id !== id);
++    if (this.selectedEdgeId === id) this.selectedEdgeId = null;
++  }
+ 
+-  // Трансляція стану візуального графа у RuntimeSnapshot для engine/core.ts
+-  compileToSnapshot(): RuntimeSnapshot {
+-    const snapshot = createInitialSnapshot(2);
+-    // Логіка мапінгу вузлів графа на фізичні структури GMP / hchan
+-    return snapshot;
++  clear() {
++    this.nodes = [];
++    this.edges = [];
++    this.selectedNodeId = null;
++    this.selectedEdgeId = null;
++    
++    Object.keys(typeCounters).forEach(key => {
++      typeCounters[key as CanvasNodeType] = 0;
++    });
+   }
+ }
+ 
+-export const canvasStore = new CanvasStore();
++export const canvasStore = new CanvasStore();
+\ No newline at end of file
+diff --git a/src/lib/canvas/types/nodes.ts b/src/lib/canvas/types/nodes.ts
+index c7eabc7..0933083 100644
+--- a/src/lib/canvas/types/nodes.ts
++++ b/src/lib/canvas/types/nodes.ts
+@@ -1,4 +1,4 @@
+-export type CanvasNodeType = 'goroutine' | 'channel' | 'mutex' | 'waitgroup' | 'context';
++export type CanvasNodeType = 'goroutine' | 'channel' | 'mutex' | 'waitgroup' | 'select';
+ 
+ export interface BaseCanvasNode {
+   id: string;
+@@ -10,9 +10,10 @@ export interface BaseCanvasNode {
+ export interface GoroutineCanvasNode extends BaseCanvasNode {
+   type: 'goroutine';
+   goid: number;
++  status: '_Grunnable' | '_Grunning' | '_Gwaiting';
+   instructions: Array<{
+     type: 'send' | 'recv' | 'lock' | 'unlock' | 'wg_add' | 'wg_wait';
+-    targetId: string; // ID вузла каналу або мутекса
++    targetId: string;
+     payload?: string;
+   }>;
+ }
+@@ -20,11 +21,36 @@ export interface GoroutineCanvasNode extends BaseCanvasNode {
+ export interface ChannelCanvasNode extends BaseCanvasNode {
+   type: 'channel';
+   capacity: number;
++  values: string[];
++  closed: boolean;
+ }
+ 
++export interface MutexCanvasNode extends BaseCanvasNode {
++  type: 'mutex';
++  locked: boolean;
++  starving: boolean;
++  waitersCount: number;
++}
++
++export interface WaitGroupCanvasNode extends BaseCanvasNode {
++  type: 'waitgroup';
++  counter: number;
++  waiterCount: number;
++}
++
++export interface SelectCanvasNode extends BaseCanvasNode {
++  type: 'select';
++  cases: Array<{
++    kind: 'send' | 'recv' | 'default';
++    targetId: string;
++  }>;
++}
++
++export type CanvasNode = GoroutineCanvasNode | ChannelCanvasNode | MutexCanvasNode | WaitGroupCanvasNode | SelectCanvasNode;
++
+ export interface CanvasEdge {
+   id: string;
+   sourceNodeId: string;
+   targetNodeId: string;
+   kind: 'data_flow' | 'sync_lock' | 'context_signal';
+-}
++}
+\ No newline at end of file
+diff --git a/src/lib/inspector/components/SchedulerTopology.svelte b/src/lib/inspector/components/SchedulerTopology.svelte
+index 3e72ae6..5ebcadc 100644
+--- a/src/lib/inspector/components/SchedulerTopology.svelte
++++ b/src/lib/inspector/components/SchedulerTopology.svelte
+@@ -1,127 +1,108 @@
+ <script lang="ts">
+   import { timeline } from '../state/timeline.svelte';
++  import { canvasStore } from '../../canvas/state/canvas.svelte';
+   import { i18n } from '../../i18n/i18n.svelte';
+-  import { Cpu, Server, Layers, Activity } from 'lucide-svelte';
++  import { Cpu, Server, Activity, Layers } from 'lucide-svelte';
+ 
+   let snapshot = $derived(timeline.currentSnapshot);
++  
++  let canvasGoroutines = $derived(
++    canvasStore.nodes.filter(n => n.type === 'goroutine')
++  );
++
+   let processors = $derived(snapshot ? Object.values(snapshot.processors) : []);
+-  let goroutines = $derived(snapshot ? Object.values(snapshot.goroutines) : []);
+   let grq = $derived(snapshot?.sched.grq ?? []);
+ 
+   function getStatusBadge(status: string) {
+     switch (status) {
+-      case '_Grunning': return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+-      case '_Grunnable': return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400';
+-      case '_Gwaiting': return 'border-amber-500/30 bg-amber-500/10 text-amber-500 dark:text-amber-300';
+-      default: return 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400';
++      case '_Grunning': return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
++      case '_Grunnable': return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400';
++      case '_Gwaiting': return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
++      default: return 'border-zinc-800 bg-zinc-900 text-zinc-400';
+     }
+   }
+ </script>
+ 
+-{#if snapshot}
+-  <div class="glow-card p-6 space-y-6 animate-fade-in">
+-    <!-- Header -->
+-    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+-      <div class="flex items-center gap-3">
+-        <div class="rounded-lg bg-indigo-500/10 p-2.5 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20">
+-          <Cpu class="h-5 w-5" />
+-        </div>
+-        <div>
+-          <h2 class="font-mono text-lg font-bold text-zinc-900 dark:text-white">{i18n.t('inspector.scheduler.title')}</h2>
+-          <p class="text-xs font-mono text-zinc-500 dark:text-zinc-400">{i18n.t('inspector.scheduler.subtitle')}</p>
+-        </div>
++<div class="space-y-4 font-mono text-xs animate-fade-in">
++  <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
++    <div class="flex items-center gap-2">
++      <div class="rounded-lg bg-indigo-500/10 p-2 text-indigo-400 border border-indigo-500/20">
++        <Cpu class="h-4 w-4" />
+       </div>
+-
+-      <div class="flex items-center gap-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 text-xs font-mono border border-zinc-200 dark:border-zinc-800">
+-        <Layers class="h-4 w-4 text-purple-500 dark:text-purple-400" />
+-        <span class="text-zinc-500 dark:text-zinc-400">{i18n.t('inspector.scheduler.grq')}:</span>
+-        <span class="text-purple-500 dark:text-purple-400 font-bold">[{grq.join(', ')}]</span>
++      <div>
++        <h2 class="font-bold text-zinc-100">{i18n.t('inspector.scheduler.title')}</h2>
++        <p class="text-[10px] text-zinc-400">Synced with Canvas Engine</p>
+       </div>
+     </div>
+ 
+-    <!-- Processors Grid -->
+-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+-      {#each processors as p}
+-        <div class="inner-card p-4 space-y-3 font-mono text-xs">
+-          <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+-            <span class="text-cyan-600 dark:text-cyan-400 font-bold flex items-center gap-1.5">
+-              <Server class="h-4 w-4" /> {i18n.t('inspector.scheduler.processor')} P{p.id}
+-            </span>
+-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400">
+-              {p.status} | ticks: {p.schedtick}
+-            </span>
+-          </div>
++    <div class="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1 border border-zinc-800 text-[11px]">
++      <Layers class="h-3.5 w-3.5 text-purple-400" />
++      <span class="text-zinc-400">GRQ:</span>
++      <span class="text-purple-400 font-bold">[{grq.join(', ')}]</span>
++    </div>
++  </div>
+ 
+-          <div class="space-y-2">
+-            <div class="flex items-center justify-between rounded-lg bg-zinc-50 dark:bg-zinc-950 p-2 border border-zinc-200 dark:border-zinc-800">
+-              <span class="text-zinc-500 dark:text-zinc-400 text-[11px]">{i18n.t('inspector.scheduler.runnext')}:</span>
+-              {#if p.runnext !== undefined}
+-                <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 font-bold border border-cyan-500/30 text-[11px]">
+-                  G{p.runnext}
+-                </span>
+-              {:else}
+-                <span class="text-zinc-400 dark:text-zinc-500 italic">nil</span>
+-              {/if}
+-            </div>
++  <div class="grid grid-cols-1 gap-3">
++    {#each processors as p}
++      <div class="inner-card p-3 space-y-2">
++        <div class="flex items-center justify-between border-b border-zinc-800 pb-1.5">
++          <span class="text-cyan-400 font-bold flex items-center gap-1.5 text-[11px]">
++            <Server class="h-3.5 w-3.5" /> Processor P{p.id}
++          </span>
++          <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">
++            {p.status} | ticks: {p.schedtick}
++          </span>
++        </div>
+ 
+-            <div class="rounded-lg bg-zinc-50 dark:bg-zinc-950 p-2 border border-zinc-200 dark:border-zinc-800">
+-              <span class="text-zinc-500 dark:text-zinc-400 text-[11px] block mb-1.5">{i18n.t('inspector.scheduler.lrq')}:</span>
+-              {#if p.runq.length > 0}
+-                <div class="flex flex-wrap gap-1.5">
+-                  {#each p.runq as goid}
+-                    <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 text-[11px]">
+-                      G{goid}
+-                    </span>
+-                  {/each}
+-                </div>
+-              {:else}
+-                <span class="text-zinc-400 dark:text-zinc-500 italic text-[11px]">queue empty</span>
+-              {/if}
+-            </div>
++        <div class="space-y-1.5 text-[10px]">
++          <div class="flex items-center justify-between rounded bg-zinc-950 p-1.5 border border-zinc-800/60">
++            <span class="text-zinc-400">runnext:</span>
++            {#if p.runnext !== undefined}
++              <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/30">
++                G{p.runnext}
++              </span>
++            {:else}
++              <span class="text-zinc-500 italic">nil</span>
++            {/if}
+           </div>
+ 
+-          <div class="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[11px]">
+-            <span class="text-zinc-500 dark:text-zinc-400">{i18n.t('inspector.scheduler.boundThread')}:</span>
+-            {#if p.m !== undefined}
+-              <span class="text-emerald-600 dark:text-emerald-400 font-bold">M{p.m}</span>
++          <div class="rounded bg-zinc-950 p-1.5 border border-zinc-800/60">
++            <span class="text-zinc-400 block mb-1">LRQ (Local Run Queue):</span>
++            {#if p.runq.length > 0}
++              <div class="flex flex-wrap gap-1">
++                {#each p.runq as goid}
++                  <span class="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
++                    G{goid}
++                  </span>
++                {/each}
++              </div>
+             {:else}
+-              <span class="text-zinc-400 dark:text-zinc-500">unbound</span>
++              <span class="text-zinc-500 italic">queue empty</span>
+             {/if}
+           </div>
+         </div>
+-      {/each}
+-    </div>
+-
+-    <!-- Goroutines -->
+-    <div class="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+-      <h3 class="font-mono text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
+-        <Activity class="h-4 w-4 text-emerald-500 dark:text-emerald-400" /> {i18n.t('inspector.scheduler.goroutineLifecycle')}
+-      </h3>
+-
+-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 font-mono text-xs">
+-        {#each goroutines as g}
+-          <div class="inner-card p-3 space-y-2">
+-            <div class="flex items-center justify-between">
+-              <span class="font-bold text-zinc-900 dark:text-white">G{g.goid}</span>
+-              <span class="px-2 py-0.5 rounded-full text-[10px] border {getStatusBadge(g.status)}">
+-                {g.status}
+-              </span>
+-            </div>
++      </div>
++    {/each}
++  </div>
+ 
+-            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 space-y-0.5 bg-zinc-50 dark:bg-zinc-950 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800">
+-              <div>stack.hi: <span class="text-zinc-700 dark:text-zinc-300">{g.stack.hi}</span></div>
+-              <div>stack.sp: <span class="text-amber-600 dark:text-amber-400">{g.stack.sp}</span></div>
+-              <div>stack.lo: <span class="text-zinc-700 dark:text-zinc-300">{g.stack.lo}</span></div>
+-            </div>
++  <!-- Canvas Synced Goroutines -->
++  <div class="border-t border-zinc-800 pt-3">
++    <h3 class="font-bold text-zinc-200 uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
++      <Activity class="h-3.5 w-3.5 text-emerald-400" /> Active Goroutines ({canvasGoroutines.length})
++    </h3>
+ 
+-            {#if g.waitReason}
+-              <div class="text-[10px] text-amber-500/80 dark:text-amber-400/80 italic">
+-                {i18n.t('inspector.scheduler.parkReason')}: {g.waitReason}
+-              </div>
+-            {/if}
++    <div class="grid grid-cols-1 gap-2">
++      {#each canvasGoroutines as g}
++        <div class="inner-card p-2.5 flex items-center justify-between">
++          <div class="flex items-center gap-2">
++            <span class="font-bold text-zinc-100 text-[11px]">{g.label}</span>
++            <span class="text-zinc-500 text-[10px]">(G{(g as any).goid})</span>
+           </div>
+-        {/each}
+-      </div>
++          <span class="px-2 py-0.5 rounded-full text-[9px] border {getStatusBadge((g as any).status)}">
++            {(g as any).status}
++          </span>
++        </div>
++      {/each}
+     </div>
+   </div>
+-{/if}
++</div>
+\ No newline at end of file
+diff --git a/tsconfig.json b/tsconfig.json
+index 1ffef60..03f18e1 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -1,7 +1,18 @@
+ {
+-  "files": [],
+-  "references": [
+-    { "path": "./tsconfig.app.json" },
+-    { "path": "./tsconfig.node.json" }
++  "compilerOptions": {
++    "target": "ES2022",
++    "module": "ESNext",
++    "moduleResolution": "bundler",
++    "paths": {
++      "$lib": ["./src/lib"],
++      "$lib/*": ["./src/lib/*"]
++    },
++    "strict": true,
++    "skipLibCheck": true
++  },
++  "include": [
++    "src/**/*.ts",
++    "src/**/*.d.ts",
++    "src/**/*.svelte"
+   ]
+-}
++}
+\ No newline at end of file

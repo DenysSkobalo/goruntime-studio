@@ -1,17 +1,221 @@
-import type { BaseCanvasNode, CanvasEdge } from '../types/nodes';
-import { createInitialSnapshot } from '../../engine/core';
-import type { RuntimeSnapshot } from '../../engine/types';
+import type { CanvasNode, CanvasEdge, CanvasNodeType } from '../types/nodes';
+
+const typeCounters: Record<CanvasNodeType, number> = {
+  goroutine: 0,
+  channel: 0,
+  mutex: 0,
+  waitgroup: 0,
+  select: 0,
+};
+
+export type CanvasTool = 'pointer' | 'connect' | CanvasNodeType;
+
+export function isValidConnection(srcType: CanvasNodeType, tgtType: CanvasNodeType): boolean {
+  if (srcType === 'mutex' || tgtType === 'mutex') {
+    return (srcType === 'goroutine' && tgtType === 'mutex') || (srcType === 'mutex' && tgtType === 'goroutine');
+  }
+  if (srcType === 'waitgroup' || tgtType === 'waitgroup') {
+    return (srcType === 'goroutine' && tgtType === 'waitgroup') || (srcType === 'waitgroup' && tgtType === 'goroutine');
+  }
+  if (srcType === 'select' || tgtType === 'select') {
+    const allowed = ['goroutine', 'channel'];
+    return allowed.includes(srcType) && allowed.includes(tgtType) && srcType !== tgtType;
+  }
+  if (srcType === 'channel' && tgtType === 'channel') {
+    return false;
+  }
+  return true;
+}
+
+export type ExtendedCanvasEdge = CanvasEdge & {
+  source: string;
+  target: string;
+};
 
 class CanvasStore {
-  nodes = $state<BaseCanvasNode[]>([]);
   edges = $state<CanvasEdge[]>([]);
+  nodes = $state<CanvasNode[]>([]);
   selectedNodeId = $state<string | null>(null);
+  selectedEdgeId = $state<string | null>(null);
+  activeTool = $state<CanvasTool>('pointer');
+  isSimulating = $state(false);
 
-  // Трансляція стану візуального графа у RuntimeSnapshot для engine/core.ts
-  compileToSnapshot(): RuntimeSnapshot {
-    const snapshot = createInitialSnapshot(2);
-    // Логіка мапінгу вузлів графа на фізичні структури GMP / hchan
-    return snapshot;
+  setTool(tool: CanvasTool) {
+    this.activeTool = tool;
+    if (tool !== 'pointer' && tool !== 'connect') {
+      this.selectedNodeId = null;
+      this.selectedEdgeId = null;
+    }
+  }
+
+  addNode(type: CanvasNodeType, position: { x: number; y: number }, label?: string): CanvasNode {
+    typeCounters[type]++;
+    const currentIndex = typeCounters[type];
+    const id = `${type}-${currentIndex}`;
+    const nodeLabel = label || `${type}-${currentIndex}`;
+
+    const base = {
+      id,
+      type,
+      position: { ...position },
+      label: nodeLabel,
+    };
+
+    let node: CanvasNode;
+    switch (type) {
+      case 'goroutine':
+        node = { ...base, type: 'goroutine', goid: currentIndex, status: '_Grunnable', instructions: [] } as CanvasNode;
+        break;
+      case 'channel':
+        node = { ...base, type: 'channel', capacity: 2, values: [], closed: false } as CanvasNode;
+        break;
+      case 'mutex':
+        node = { ...base, type: 'mutex', locked: false, starving: false, waitersCount: 0 } as CanvasNode;
+        break;
+      case 'waitgroup':
+        node = { ...base, type: 'waitgroup', counter: 0, waiterCount: 0 } as CanvasNode;
+        break;
+      case 'select':
+        node = { ...base, type: 'select', cases: [] } as CanvasNode;
+        break;
+      default:
+        throw new Error(`Unknown node type: ${type}`);
+    }
+
+    this.nodes = [...this.nodes, node];
+    this.selectNode(id);
+    return node;
+  }
+
+  removeNode(id: string) {
+    this.nodes = this.nodes.filter(n => n.id !== id);
+    this.edges = this.edges.filter(
+      e => e.sourceNodeId !== id && e.targetNodeId !== id && (e as any).source !== id && (e as any).target !== id
+    );
+    if (this.selectedNodeId === id) this.selectedNodeId = null;
+  }
+
+  updatePosition(id: string, pos: { x: number; y: number }) {
+    this.nodes = this.nodes.map(n => (n.id === id ? { ...n, position: pos } : n));
+  }
+
+  selectNode(id: string | null) {
+    this.selectedNodeId = id;
+    if (id !== null) {
+      this.selectedEdgeId = null;
+    }
+  }
+
+  selectEdge(id: string | null) {
+    this.selectedEdgeId = id;
+    if (id !== null) {
+      this.selectedNodeId = null;
+    }
+  }
+
+  addEdge(sourceId: string, targetId: string, kind?: CanvasEdge['kind']): boolean {
+    if (sourceId === targetId) return false;
+
+    const src = this.getNode(sourceId);
+    const tgt = this.getNode(targetId);
+    if (!src || !tgt) return false;
+
+    if (!isValidConnection(src.type, tgt.type)) {
+      return false;
+    }
+
+    const exists = this.edges.some(
+      e =>
+        (e.sourceNodeId === sourceId && e.targetNodeId === targetId) ||
+        ((e as any).source === sourceId && (e as any).target === targetId)
+    );
+    if (exists) return false;
+
+    let finalKind = kind;
+    if (!finalKind) {
+      if (tgt.type === 'mutex') finalKind = 'sync_lock';
+      else if (tgt.type === 'waitgroup') finalKind = 'context_signal';
+      else finalKind = 'data_flow';
+    }
+
+    const edgeId = `edge-${this.edges.length + 1}`;
+    const edge: CanvasEdge = {
+      id: edgeId,
+      sourceNodeId: sourceId,
+      targetNodeId: targetId,
+      source: sourceId,
+      target: targetId,
+      kind: finalKind,
+    } as CanvasEdge;
+
+    this.edges = [...this.edges, edge];
+    this.selectEdge(edge.id);
+    return true;
+  }
+
+  reconnectEdge(edgeId: string, end: 'source' | 'target', newNodeId: string): boolean {
+    const edge = this.edges.find(e => e.id === edgeId);
+    if (!edge) return false;
+
+    const currentSource = edge.sourceNodeId || (edge as any).source;
+    const currentTarget = edge.targetNodeId || (edge as any).target;
+
+    const sourceId = end === 'source' ? newNodeId : currentSource;
+    const targetId = end === 'target' ? newNodeId : currentTarget;
+
+    if (sourceId === targetId) return false;
+
+    const src = this.getNode(sourceId);
+    const tgt = this.getNode(targetId);
+    if (!src || !tgt) return false;
+
+    if (!isValidConnection(src.type, tgt.type)) return false;
+
+    this.edges = this.edges.map(e => {
+      if (e.id !== edgeId) return e;
+      return {
+        ...e,
+        sourceNodeId: sourceId,
+        targetNodeId: targetId,
+        source: sourceId,
+        target: targetId,
+      };
+    });
+    this.selectEdge(edgeId);
+    return true;
+  }
+
+  getEdge(id: string | null): ExtendedCanvasEdge | null {
+    if (!id) return null;
+    const edge = this.edges.find(e => e.id === id);
+    if (!edge) return null;
+
+    return {
+      ...edge,
+      source: (edge as any).source || edge.sourceNodeId,
+      target: (edge as any).target || edge.targetNodeId,
+    };
+  }
+
+  getNode(id: string | null): CanvasNode | null {
+    if (!id) return null;
+    return this.nodes.find(node => node.id === id) ?? null;
+  }
+
+  removeEdge(id: string) {
+    this.edges = this.edges.filter(e => e.id !== id);
+    if (this.selectedEdgeId === id) this.selectedEdgeId = null;
+  }
+
+  clear() {
+    this.nodes = [];
+    this.edges = [];
+    this.selectedNodeId = null;
+    this.selectedEdgeId = null;
+    
+    Object.keys(typeCounters).forEach(key => {
+      typeCounters[key as CanvasNodeType] = 0;
+    });
   }
 }
 

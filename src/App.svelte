@@ -1,18 +1,31 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Navigation from './lib/shared/Navigation.svelte';
+  import './app.css';
+  import Workspace from './lib/workspace/Workspace.svelte';
+  import DocsView from './lib/docs/DocsView.svelte';
   import SettingsModal from './lib/shared/SettingsModal.svelte';
-  import InspectorView from './lib/inspector/InspectorView.svelte';
-  import CanvasView from './lib/canvas/CanvasView.svelte';
   import { i18n } from './lib/i18n/i18n.svelte';
   import { themeStore } from './lib/theme/theme.svelte';
 
-  type Mode = 'inspector' | 'canvas';
-  let activeMode = $state<Mode>('inspector');
+  let currentRoute = $state<'workspace' | 'docs'>('workspace');
+
+  function updateRoute() {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    if (path === '/docs' || hash.startsWith('#docs')) {
+      currentRoute = 'docs';
+    } else {
+      currentRoute = 'workspace';
+    }
+  }
 
   onMount(() => {
     document.documentElement.lang = i18n.lang;
     themeStore.sync();
+    updateRoute();
+
+    window.addEventListener('popstate', updateRoute);
+    window.addEventListener('hashchange', updateRoute);
 
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => {
@@ -21,24 +34,24 @@
       }
     };
     mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
+
+    return () => {
+      window.removeEventListener('popstate', updateRoute);
+      window.removeEventListener('hashchange', updateRoute);
+      mql.removeEventListener('change', handler);
+    };
   });
+
+  function navigateToWorkspace() {
+    window.history.pushState({}, '', '/');
+    currentRoute = 'workspace';
+  }
 </script>
 
-<main class="min-h-screen flex flex-col">
-  <Navigation bind:activeMode />
+{#if currentRoute === 'docs'}
+  <DocsView onBack={navigateToWorkspace} />
+{:else}
+  <Workspace />
+{/if}
 
-  <SettingsModal />
-
-  <div class="flex-1 p-4 md:p-6 max-w-5xl mx-auto w-full">
-    {#key activeMode}
-      <div class="animate-fade-in">
-        {#if activeMode === 'inspector'}
-          <InspectorView />
-        {:else}
-          <CanvasView />
-        {/if}
-      </div>
-    {/key}
-  </div>
-</main>
+<SettingsModal />

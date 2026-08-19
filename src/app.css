@@ -61,9 +61,19 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #a1a1aa;
   }
+
+  button:focus,
+  button:focus-visible,
+  [role="button"]:focus,
+  [role="button"]:focus-visible,
+  [tabindex]:focus,
+  [tabindex]:focus-visible {
+    outline: none !important;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
-/* ── Glow Card ── */
 .glow-card {
   position: relative;
   overflow: hidden;
@@ -83,7 +93,6 @@
   border-color: #3f3f46;
 }
 
-/* ── Inner Card ── */
 .inner-card {
   border-radius: 0.75rem;
   border: 1px solid #f4f4f5;
