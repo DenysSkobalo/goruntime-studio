@@ -1,18 +1,23 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "moduleResolution": "bundler",
     "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
-    },
-    "strict": true,
-    "skipLibCheck": true
+      "$lib/*": ["./src/shared/*"],
+      "$core/*": ["./src/core/*"],
+      "$features/*": ["./src/features/*"],
+      "$shared/*": ["./src/shared/*"],
+      "$app/*": ["./src/app/*"]
+    }
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "src/**/*.svelte"
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".svelte-kit",
+    ".output",
+    "public",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }
