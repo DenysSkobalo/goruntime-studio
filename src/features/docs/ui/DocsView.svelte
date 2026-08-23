@@ -1,18 +1,18 @@
 <script lang="ts">
-    import { ExternalLink, Cpu, ShieldAlert, Code2, ArrowLeft } from 'lucide-svelte';
-    import { RUNTIME_DOCS } from '../data/runtime-docs';
-    import type { RuntimeDocEntry } from '../data/types';
+  import { ExternalLink, Cpu, ShieldAlert, Code2, ArrowLeft } from 'lucide-svelte';
+  import { RUNTIME_DOCS } from '../data/runtime-docs';
+  import type { RuntimeDocEntry } from '../data/types';
 
   let { onBack }: { onBack?: () => void } = $props();
 
   const docsList = Object.values(RUNTIME_DOCS) as RuntimeDocEntry[];
 </script>
 
-<div class="min-h-screen bg-zinc-950 text-zinc-100 p-6 md:p-10 font-sans">
+<div class="min-h-screen bg-zinc-950 text-zinc-100 p-6 md:p-10 font-sans select-none">
   <header class="max-w-6xl mx-auto border-b border-zinc-800 pb-6 mb-8 flex items-center justify-between">
     <div>
       <div class="flex items-center gap-3 mb-2">
-        <Cpu class="w-7 h-7 text-sky-400" />
+        <Cpu class="w-7 h-7 text-emerald-400" />
         <h1 class="text-2xl font-bold tracking-tight text-white">Go Runtime Internals & Specifications</h1>
       </div>
       <p class="text-zinc-400 text-xs md:text-sm max-w-3xl font-mono">
@@ -37,9 +37,8 @@
         <b>System Model Assumptions & Constraints</b>
       </div>
       <ul class="list-disc list-inside space-y-1 text-xs text-amber-200/80">
-        <li><b>Pointer Alignment:</b> Pointer width is 8 Bytes (64-bit). Field offsets change on 32-bit platforms.</li>
-        <li><b>GC Write Barriers:</b> Direct Stack Transfer via <code>runtime.memmove</code> requires GC idle state (<code>_GCoff</code>).</li>
-        <li><b>Internal Unstable Specs:</b> Struct layouts in <code>runtime/*</code> may change between Go toolchain releases.</li>
+        <li><b>Pointer Alignment:</b> Pointer width is 8 Bytes (64-bit).</li>
+        <li><b>GC Write Barriers:</b> Direct Stack Transfer via <code>runtime.memmove</code>.</li>
       </ul>
     </section>
 
@@ -49,7 +48,7 @@
           <div>
             <div class="flex items-center gap-3">
               <h2 class="text-xl font-bold text-white">{entry.title}</h2>
-              <span class="font-mono text-xs text-sky-400 bg-sky-950/60 border border-sky-800/50 px-2 py-0.5 rounded">
+              <span class="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded">
                 {entry.structName}
               </span>
               <span class="text-xs text-zinc-500 font-mono">
@@ -60,16 +59,6 @@
           </div>
 
           <div class="flex items-center gap-2 font-mono">
-            {#if entry.source.specUrl}
-              <a
-                href={entry.source.specUrl}
-                target="_blank"
-                rel="noreferrer"
-                class="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-sky-400 bg-zinc-800 px-3 py-1.5 rounded-md transition"
-              >
-                <Code2 class="w-3.5 h-3.5" /> Spec
-              </a>
-            {/if}
             <a
               href={entry.source.repoUrl}
               target="_blank"
@@ -105,9 +94,9 @@
               <tbody class="divide-y divide-zinc-800/50">
                 {#each entry.memoryLayout as row}
                   <tr class="hover:bg-zinc-800/30 text-zinc-300">
-                    <td class="py-2 px-3 text-sky-400">{row.offset}</td>
+                    <td class="py-2 px-3 text-emerald-400">{row.offset}</td>
                     <td class="py-2 px-3 font-bold text-zinc-200">{row.field}</td>
-                    <td class="py-2 px-3 text-emerald-400">{row.type}</td>
+                    <td class="py-2 px-3 text-cyan-400">{row.type}</td>
                     <td class="py-2 px-3 text-zinc-400 font-sans">{row.note}</td>
                   </tr>
                 {/each}

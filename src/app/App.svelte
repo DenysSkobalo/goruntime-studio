@@ -3,9 +3,9 @@
   import '../app.css';
   import Workspace from './views/Workspace.svelte';
   import { i18n } from '$core/i18n';
-  import { themeStore } from '$core/theme/store.svelte.ts';
+  import { themeStore } from '$core/theme/store.svelte';
   import DocsView from '$features/docs/ui/DocsView.svelte';
-  import SettingsModal from '$lib/ui/SettingsModal.svelte';
+  import SettingsModal from '$shared/ui/SettingsModal.svelte';
 
   let currentRoute = $state<'workspace' | 'docs'>('workspace');
 

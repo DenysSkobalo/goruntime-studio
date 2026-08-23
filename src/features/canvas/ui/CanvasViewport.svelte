@@ -1,60 +1,44 @@
 <script lang="ts">
-    import type { CanvasNode, CanvasNodeType } from "$lib/types/nodes";
-    import CanvasNodeComponent from "./CanvasNode.svelte";
-    import { i18n } from "$core/i18n";
-    import { canvasStore, isValidConnection } from "../model/canvas.store.svelte";
-    import CanvasEdge from "./CanvasEdge.svelte";
-    import { getToolBannerColor } from "../utils/colors";
-    import CanvasEdgeOverlay from "./CanvasEdgeOverlay.svelte";
+  import type { CanvasNode, CanvasNodeType } from "$shared/types/nodes";
+  import CanvasNodeComponent from "./CanvasNode.svelte";
+  import { canvasStore, validateConnection } from "../model/canvas.store.svelte";
+  import CanvasEdge from "./CanvasEdge.svelte";
+  import CanvasEdgeOverlay from "./CanvasEdgeOverlay.svelte";
+  import { getToolBannerColor } from "../utils/colors";
+  import { stackModalStore } from "$shared/stores/stack-modal.store.svelte";
+  import { computeBezierPath, getBezierParams, getNodeAnchor } from "../utils/geometry";
 
   let viewportRef = $state<HTMLDivElement | null>(null);
 
+  // Стан драгування ноди
   let isDraggingNode = $state(false);
   let draggedNodeId = $state<string | null>(null);
-  let dragOffset = $state({ x: 0, y: 0 });
+  let dragOffset = { x: 0, y: 0 };
 
+  // Зв'язування та перевизначення
   let connectingSourceId = $state<string | null>(null);
-
   let reconnectingEdgeId = $state<string | null>(null);
   let reconnectingEnd = $state<'source' | 'target' | null>(null);
-
+  let hoveredNodeId = $state<string | null>(null);
   let mousePos = $state({ x: 0, y: 0 });
 
-  // Автоматичне скидання лінії з'єднання при зміні активного інструмента
-  $effect(() => {
-    if (canvasStore.activeTool !== 'connect') {
-      connectingSourceId = null;
-      reconnectingEdgeId = null;
-      reconnectingEnd = null;
-    }
-  });
+  // Frame-Lock прапорець для запобігання переповненню черги кадрів
+  let isTicking = false;
+  let latestPointerCoords = { x: 0, y: 0 };
 
-  let cursorClass = $derived.by(() => {
-    if (canvasStore.activeTool === 'pointer') {
-      return isDraggingNode ? 'cursor-grabbing' : 'cursor-grab';
-    }
-    return 'cursor-crosshair';
-  });
-
-  function getCanvasCoordinates(e: PointerEvent): { x: number; y: number } {
-    if (!viewportRef) return { x: e.clientX, y: e.clientY };
+  function getCanvasCoordinates(clientX: number, clientY: number) {
+    if (!viewportRef) return { x: clientX, y: clientY };
     const rect = viewportRef.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
+    return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
   function handleCanvasPointerDown(e: PointerEvent) {
-    const coords = getCanvasCoordinates(e);
+    if (e.button !== 0) return;
+    const coords = getCanvasCoordinates(e.clientX, e.clientY);
     const activeTool = canvasStore.activeTool;
 
-    const isNodeType = ['goroutine', 'channel', 'mutex', 'waitgroup', 'select'].includes(activeTool);
-    if (isNodeType) {
-      canvasStore.addNode(
-        activeTool as CanvasNodeType,
-        { x: Math.max(10, coords.x - 70), y: Math.max(10, coords.y - 40) }
-      );
+    if (activeTool !== 'pointer' && activeTool !== 'connect') {
+      canvasStore.addNode(activeTool as CanvasNodeType, { x: Math.max(10, coords.x - 72.5), y: Math.max(10, coords.y - 37) });
       canvasStore.setTool('pointer');
       return;
     }
@@ -62,162 +46,182 @@
     canvasStore.selectNode(null);
     canvasStore.selectEdge(null);
     connectingSourceId = null;
+    reconnectingEdgeId = null;
   }
 
   function handleNodePointerDown(e: PointerEvent, node: CanvasNode) {
+    if (e.button !== 0) return;
     e.stopPropagation();
-    const coords = getCanvasCoordinates(e);
+
+    const coords = getCanvasCoordinates(e.clientX, e.clientY);
 
     if (canvasStore.activeTool === 'connect') {
       if (connectingSourceId && connectingSourceId !== node.id) {
-        const srcNode = canvasStore.getNode(connectingSourceId);
-        if (srcNode && isValidConnection(srcNode.type, node.type)) {
+        const check = validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId, node.id);
+        if (check.valid) {
           canvasStore.addEdge(connectingSourceId, node.id);
         }
         connectingSourceId = null;
+        canvasStore.setTool('pointer');
       } else {
         connectingSourceId = node.id;
       }
       return;
     }
 
-    if (['goroutine', 'channel', 'mutex', 'waitgroup', 'select'].includes(canvasStore.activeTool)) {
-      return;
-    }
-
     canvasStore.selectNode(node.id);
     isDraggingNode = true;
     draggedNodeId = node.id;
-    dragOffset = {
-      x: coords.x - node.position.x,
-      y: coords.y - node.position.y,
-    };
+    dragOffset = { x: coords.x - node.position.x, y: coords.y - node.position.y };
+
+    // Реєстрація глобальних слухачів для ідеально плавної траєкторії руху
+    window.addEventListener('pointermove', handleWindowPointerMove, { passive: true });
+    window.addEventListener('pointerup', handleWindowPointerUp);
   }
 
-  function handleNodePointerUp(node: CanvasNode) {
-    if (connectingSourceId && connectingSourceId !== node.id) {
-      const srcNode = canvasStore.getNode(connectingSourceId);
-      if (srcNode && isValidConnection(srcNode.type, node.type)) {
-        canvasStore.addEdge(connectingSourceId, node.id);
-      }
-      connectingSourceId = null;
-    }
+  function handleWindowPointerMove(e: PointerEvent) {
+    latestPointerCoords = getCanvasCoordinates(e.clientX, e.clientY);
 
-    if (reconnectingEdgeId && reconnectingEnd) {
-      canvasStore.reconnectEdge(reconnectingEdgeId, reconnectingEnd, node.id);
-      reconnectingEdgeId = null;
-      reconnectingEnd = null;
-    }
-  }
+    if (!isTicking) {
+      isTicking = true;
+      requestAnimationFrame(() => {
+        mousePos = latestPointerCoords;
 
-  function handlePointerMove(e: PointerEvent) {
-    const coords = getCanvasCoordinates(e);
-    mousePos = coords;
-
-    if (isDraggingNode && draggedNodeId) {
-      const newX = Math.max(10, coords.x - dragOffset.x);
-      const newY = Math.max(10, coords.y - dragOffset.y);
-      canvasStore.updatePosition(draggedNodeId, { x: newX, y: newY });
-    }
-  }
-
-  function handleGlobalPointerUp(e: PointerEvent) {
-    if (reconnectingEdgeId && reconnectingEnd) {
-      const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-      const nodeEl = targetEl?.closest('[data-node-id]');
-      if (nodeEl) {
-        const nodeId = nodeEl.getAttribute('data-node-id');
-        if (nodeId) {
-          canvasStore.reconnectEdge(reconnectingEdgeId, reconnectingEnd, nodeId);
+        if (isDraggingNode && draggedNodeId) {
+          const nextX = Math.max(10, latestPointerCoords.x - dragOffset.x);
+          const nextY = Math.max(10, latestPointerCoords.y - dragOffset.y);
+          canvasStore.updatePosition(draggedNodeId, { x: nextX, y: nextY });
         }
-      }
+
+        isTicking = false;
+      });
+    }
+  }
+
+  function handleWindowPointerUp() {
+    if (isDraggingNode) {
+      isDraggingNode = false;
+      draggedNodeId = null;
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+    }
+    reconnectingEdgeId = null;
+    reconnectingEnd = null;
+  }
+
+  function handleViewportPointerMove(e: PointerEvent) {
+    // Оновлення курсора та hoveredState поза активним драгуванням
+    if (!isDraggingNode) {
+      const coords = getCanvasCoordinates(e.clientX, e.clientY);
+      mousePos = coords;
+
+      const targetEl = (e.target as HTMLElement).closest('[data-node-id]') as HTMLElement | null;
+      hoveredNodeId = targetEl ? targetEl.getAttribute('data-node-id') : null;
+    }
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+      return;
+    }
+
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      canvasStore.setTool('pointer');
+      connectingSourceId = null;
       reconnectingEdgeId = null;
       reconnectingEnd = null;
-    }
-    isDraggingNode = false;
-    draggedNodeId = null;
-  }
-
-  function handleStartReconnect(e: PointerEvent, edgeId: string, end: 'source' | 'target') {
-    e.stopPropagation();
-    reconnectingEdgeId = edgeId;
-    reconnectingEnd = end;
-  }
-
-  function handleKeyDown(event: KeyboardEvent) {
-    const target = event.target as HTMLElement;
-    if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+      canvasStore.selectNode(null);
+      canvasStore.selectEdge(null);
       return;
     }
 
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return;
-    }
-
-    const key = event.key.toLowerCase();
-    const code = event.code;
-
-    if (key === '1' || code === 'Digit1' || code === 'Numpad1' || key === 'v' || code === 'KeyV') {
+    if (e.code === 'KeyV') {
+      e.preventDefault();
       canvasStore.setTool('pointer');
-    } else if (key === '2' || code === 'Digit2' || code === 'Numpad2' || key === 'g' || code === 'KeyG') {
-      canvasStore.setTool('goroutine');
-    } else if (key === '3' || code === 'Digit3' || code === 'Numpad3' || key === 'c' || code === 'KeyC') {
-      canvasStore.setTool('channel');
-    } else if (key === '4' || code === 'Digit4' || code === 'Numpad4' || key === 'm' || code === 'KeyM') {
-      canvasStore.setTool('mutex');
-    } else if (key === '5' || code === 'Digit5' || code === 'Numpad5' || key === 'w' || code === 'KeyW') {
-      canvasStore.setTool('waitgroup');
-    } else if (key === '6' || code === 'Digit6' || code === 'Numpad6' || key === 's' || code === 'KeyS') {
-      canvasStore.setTool('select');
-    } else if (key === '7' || code === 'Digit7' || code === 'Numpad7' || key === 'l' || code === 'KeyL') {
-      canvasStore.setTool('connect');
-    } else if (event.key === 'Delete' || event.key === 'Backspace') {
+    } else if (e.code === 'KeyG') {
+      e.preventDefault();
+      canvasStore.setTool(canvasStore.activeTool === 'goroutine' ? 'pointer' : 'goroutine');
+    } else if (e.code === 'KeyC') {
+      e.preventDefault();
+      canvasStore.setTool(canvasStore.activeTool === 'channel' ? 'pointer' : 'channel');
+    } else if (e.code === 'KeyL') {
+      e.preventDefault();
+      canvasStore.setTool(canvasStore.activeTool === 'connect' ? 'pointer' : 'connect');
+    } else if (e.code === 'KeyP') {
+      e.preventDefault();
+      const selectedNode = canvasStore.getNode(canvasStore.selectedNodeId);
+      const goid = selectedNode && selectedNode.type === 'goroutine' ? selectedNode.goid : 1;
+      stackModalStore.open(goid);
+    } else if (e.code === 'Delete' || e.code === 'Backspace' || e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
       if (canvasStore.selectedNodeId) {
         canvasStore.removeNode(canvasStore.selectedNodeId);
       } else if (canvasStore.selectedEdgeId) {
         canvasStore.removeEdge(canvasStore.selectedEdgeId);
       }
-    } else if (event.key === 'Escape') {
-      canvasStore.selectNode(null);
-      canvasStore.selectEdge(null);
-      connectingSourceId = null;
-      reconnectingEdgeId = null;
-      reconnectingEnd = null;
-      canvasStore.setTool('pointer');
     }
   }
+
+  function startReconnect(e: PointerEvent, edgeId: string, end: 'source' | 'target') {
+    e.stopPropagation();
+    reconnectingEdgeId = edgeId;
+    reconnectingEnd = end;
+    window.addEventListener('pointermove', handleWindowPointerMove, { passive: true });
+    window.addEventListener('pointerup', handleWindowPointerUp);
+  }
+
+  let activeConnectionState = $derived.by(() => {
+    if (canvasStore.activeTool === 'connect' && connectingSourceId) {
+      const srcNode = canvasStore.getNode(connectingSourceId);
+      if (!srcNode) return null;
+
+      let isHoverValid = false;
+      if (hoveredNodeId && hoveredNodeId !== connectingSourceId) {
+        isHoverValid = validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId, hoveredNodeId).valid;
+      }
+      return { srcNode, isHoverValid };
+    }
+    return null;
+  });
+
+  let activeReconnectState = $derived.by(() => {
+    if (reconnectingEdgeId && reconnectingEnd) {
+      const edge = canvasStore.getEdge(reconnectingEdgeId);
+      if (!edge) return null;
+      const fixedNodeId = reconnectingEnd === 'source' ? edge.target : edge.source;
+      const fixedNode = canvasStore.getNode(fixedNodeId);
+      if (!fixedNode) return null;
+
+      let isHoverValid = false;
+      if (hoveredNodeId && hoveredNodeId !== fixedNodeId) {
+        isHoverValid = validateConnection(canvasStore.nodes, canvasStore.edges, fixedNodeId, hoveredNodeId, edge.id).valid;
+      }
+      return { fixedNode, isHoverValid };
+    }
+    return null;
+  });
 </script>
 
-<svelte:window onkeydown={handleKeyDown} onpointerup={handleGlobalPointerUp} />
+<svelte:window onkeydown={handleKeyDown} />
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   bind:this={viewportRef}
-  class="canvas-viewport relative w-full h-full bg-[#09090b] overflow-hidden select-none {cursorClass}"
+  class="canvas-viewport relative w-full h-full bg-[#09090b] overflow-hidden select-none"
   role="region"
-  aria-label={i18n.t('canvas.aria.viewport')}
   tabindex="0"
   onpointerdown={handleCanvasPointerDown}
-  onpointermove={handlePointerMove}
+  onpointermove={handleViewportPointerMove}
 >
   {#if canvasStore.activeTool !== 'pointer'}
-    <div
-      class="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full text-xs font-mono text-white font-semibold shadow-xl backdrop-blur-md border border-white/10 flex items-center gap-2 pointer-events-none animate-fade-in {getToolBannerColor(
-        canvasStore.activeTool
-      )}"
-    >
-      <span>{i18n.t('canvas.tool.label')}: <strong>{canvasStore.activeTool.toUpperCase()}</strong> — {i18n.t('canvas.tool.instruction')}</span>
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full text-xs font-mono text-white font-semibold shadow-xl backdrop-blur-md border border-white/10 flex items-center gap-2 pointer-events-none {getToolBannerColor(canvasStore.activeTool)}">
+      <span>Tool: <strong>{canvasStore.activeTool.toUpperCase()}</strong> (Press ESC to cancel)</span>
     </div>
   {/if}
 
   <svg class="absolute inset-0 w-full h-full pointer-events-none z-0">
-    <defs>
-      <filter id="edge-glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="3" result="blur" />
-        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-      </filter>
-    </defs>
-
     {#each canvasStore.edges as edge (edge.id)}
       {@const srcNode = canvasStore.getNode(edge.source)}
       {@const tgtNode = canvasStore.getNode(edge.target)}
@@ -233,69 +237,65 @@
       {/if}
     {/each}
 
-    {#if connectingSourceId}
-      {@const src = canvasStore.getNode(connectingSourceId)}
-      {#if src}
-        {@const srcPt = { x: src.position.x + 70, y: src.position.y + 40 }}
-        <line
-          x1={srcPt.x}
-          y1={srcPt.y}
-          x2={mousePos.x}
-          y2={mousePos.y}
-          stroke="#f43f5e"
-          stroke-width="2"
-          stroke-dasharray="4 4"
-          class="pointer-events-none"
-        />
-      {/if}
+    {#if activeConnectionState}
+      {@const sAnchor = getNodeAnchor(activeConnectionState.srcNode, mousePos)}
+      {@const bezierParams = getBezierParams({
+        sx: sAnchor.x, sy: sAnchor.y, sideS: sAnchor.side,
+        tx: mousePos.x, ty: mousePos.y, sideT: sAnchor.side === 'left' ? 'right' : 'left'
+      })}
+      <path
+        d={computeBezierPath(bezierParams)}
+        fill="none"
+        stroke={activeConnectionState.isHoverValid ? "#f59e0b" : "#ef4444"}
+        stroke-width={activeConnectionState.isHoverValid ? "3" : "2"}
+        stroke-dasharray="6 6"
+      />
     {/if}
 
-    {#if reconnectingEdgeId && reconnectingEnd}
-      {@const activeEdge = canvasStore.getEdge(reconnectingEdgeId)}
-      {#if activeEdge}
-        {@const anchorNodeId = reconnectingEnd === 'source' ? activeEdge.target : activeEdge.source}
-        {@const anchorNode = canvasStore.getNode(anchorNodeId)}
-        {#if anchorNode}
-          {@const anchorPt = { x: anchorNode.position.x + 70, y: anchorNode.position.y + 40 }}
-          <line
-            x1={anchorPt.x}
-            y1={anchorPt.y}
-            x2={mousePos.x}
-            y2={mousePos.y}
-            stroke="#f43f5e"
-            stroke-width="2"
-            stroke-dasharray="4 4"
-            class="pointer-events-none"
-          />
-        {/if}
-      {/if}
+    {#if activeReconnectState}
+      {@const fAnchor = getNodeAnchor(activeReconnectState.fixedNode, mousePos)}
+      {@const bezierParams = getBezierParams({
+        sx: fAnchor.x, sy: fAnchor.y, sideS: fAnchor.side,
+        tx: mousePos.x, ty: mousePos.y, sideT: fAnchor.side === 'left' ? 'right' : 'left'
+      })}
+      <path
+        d={computeBezierPath(bezierParams)}
+        fill="none"
+        stroke={activeReconnectState.isHoverValid ? "#f59e0b" : "#ef4444"}
+        stroke-width="3"
+        stroke-dasharray="4 4"
+      />
     {/if}
   </svg>
 
   <div class="absolute inset-0 pointer-events-none z-10">
     {#each canvasStore.nodes as node (node.id)}
       {@const isSelected = canvasStore.selectedNodeId === node.id}
-      {@const isConnectSource = connectingSourceId === node.id}
-      {@const srcNode = connectingSourceId ? canvasStore.getNode(connectingSourceId) : null}
-      {@const isInvalidTarget = srcNode ? !isValidConnection(srcNode.type, node.type) : false}
+      {@const isConnecting = canvasStore.activeTool === 'connect' && connectingSourceId !== null}
+      {@const isReconnecting = reconnectingEdgeId !== null}
+      
+      {@const isValidTarget = (isConnecting || isReconnecting) && node.id !== (connectingSourceId || reconnectingEdgeId) && (
+        isConnecting ? validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId!, node.id).valid
+        : isReconnecting ? validateConnection(canvasStore.nodes, canvasStore.edges, reconnectingEnd === 'source' ? canvasStore.getEdge(reconnectingEdgeId!)!.target : canvasStore.getEdge(reconnectingEdgeId!)!.source, node.id, reconnectingEdgeId!).valid
+        : false
+      )}
+
+      {@const isInvalidTarget = (isConnecting || isReconnecting) && node.id !== (connectingSourceId || reconnectingEdgeId) && !isValidTarget}
 
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="pointer-events-auto inline-block"
-        onpointerup={() => handleNodePointerUp(node)}
-      >
-        <CanvasNodeComponent 
+      <div class="pointer-events-auto inline-block">
+        <CanvasNodeComponent
           {node}
           {isSelected}
-          {isConnectSource}
+          isConnectSource={connectingSourceId === node.id}
+          {isValidTarget}
           {isInvalidTarget}
           onPointerDown={(e: PointerEvent) => handleNodePointerDown(e, node)}
+          onPointerUp={() => {}}
         />
       </div>
     {/each}
-  </div>
 
-  <div class="absolute inset-0 pointer-events-none z-20">
     {#each canvasStore.edges as edge (edge.id)}
       {@const srcNode = canvasStore.getNode(edge.source)}
       {@const tgtNode = canvasStore.getNode(edge.target)}
@@ -306,8 +306,8 @@
           {tgtNode}
           isSelected={canvasStore.selectedEdgeId === edge.id}
           isReconnecting={reconnectingEdgeId === edge.id}
-          onStartReconnect={handleStartReconnect}
           onRemove={(id) => canvasStore.removeEdge(id)}
+          onStartReconnect={startReconnect}
         />
       {/if}
     {/each}

@@ -1,4 +1,15 @@
-export type CanvasNodeType = 'goroutine' | 'channel' | 'mutex' | 'waitgroup' | 'select';
+export type CanvasNodeType = 'goroutine' | 'channel';
+
+export type GoroutineStatus = '_Gidle' | '_Grunnable' | '_Grunning' | '_Gsyscall' | '_Gwaiting' | '_Gdead';
+
+export type ChannelElemType = 'string' | 'int64' | 'bool' | 'struct{}';
+
+export const ELEM_SIZE_MAP: Record<ChannelElemType, number> = {
+  'string': 16,
+  'int64': 8,
+  'bool': 1,
+  'struct{}': 0,
+};
 
 export interface BaseCanvasNode {
   id: string;
@@ -7,66 +18,23 @@ export interface BaseCanvasNode {
   label: string;
 }
 
-export type GoroutineStatus =
-  | '_Gidle'
-  | '_Grunnable'
-  | '_Grunning'
-  | '_Gsyscall'
-  | '_Gwaiting'
-  | '_Gdead';
-
-export interface GoroutineInstruction {
-  type: 'send' | 'recv' | 'lock' | 'unlock' | 'wg_add' | 'wg_wait';
-  targetId: string;
-  payload?: string;
-}
-
 export interface GoroutineNode extends BaseCanvasNode {
   type: 'goroutine';
   goid: number;
   status: GoroutineStatus;
-  instructions: GoroutineInstruction[];
 }
 
 export interface ChannelNode extends BaseCanvasNode {
   type: 'channel';
   capacity: number;
+  elemType: ChannelElemType;
   values: string[];
   closed: boolean;
 }
 
-export interface MutexNode extends BaseCanvasNode {
-  type: 'mutex';
-  locked: boolean;
-  starving: boolean;
-  waitersCount: number;
-}
+export type CanvasNode = GoroutineNode | ChannelNode;
 
-export interface WaitGroupNode extends BaseCanvasNode {
-  type: 'waitgroup';
-  counter: number;
-  waiterCount: number;
-}
-
-export interface SelectCase {
-  id: string;
-  kind: 'caseSend' | 'caseRecv' | 'caseDefault';
-  chanId?: string;
-}
-
-export interface SelectNode extends BaseCanvasNode {
-  type: 'select';
-  cases: SelectCase[];
-}
-
-export type CanvasNode =
-  | GoroutineNode
-  | ChannelNode
-  | MutexNode
-  | WaitGroupNode
-  | SelectNode;
-
-export type EdgeKind = 'data_flow' | 'sync_lock' | 'context_signal';
+export type EdgeKind = 'sudog_link';
 
 export interface CanvasEdge {
   id: string;
@@ -75,4 +43,12 @@ export interface CanvasEdge {
   source: string;
   target: string;
   kind: EdgeKind;
+}
+
+export function isGoroutineNode(node: CanvasNode | null): node is GoroutineNode {
+  return node?.type === 'goroutine';
+}
+
+export function isChannelNode(node: CanvasNode | null): node is ChannelNode {
+  return node?.type === 'channel';
 }

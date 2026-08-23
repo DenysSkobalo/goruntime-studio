@@ -1,4 +1,4 @@
-import type { CanvasNodeType } from "$lib/types/nodes";
+import type { CanvasNodeType } from "$shared/types/nodes";
 
 export interface GoSourceRef {
   file: string;

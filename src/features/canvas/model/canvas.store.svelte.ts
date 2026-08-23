@@ -1,30 +1,57 @@
-import type { CanvasEdge, CanvasNode, CanvasNodeType } from "$lib/types/nodes";
-
-const typeCounters: Record<CanvasNodeType, number> = {
-  goroutine: 0,
-  channel: 0,
-  mutex: 0,
-  waitgroup: 0,
-  select: 0,
-};
+import type { CanvasEdge, CanvasNode, CanvasNodeType, ChannelElemType } from '$shared/types/nodes';
 
 export type CanvasTool = 'pointer' | 'connect' | CanvasNodeType;
 
-export function isValidConnection(srcType: CanvasNodeType, tgtType: CanvasNodeType): boolean {
-  if (srcType === 'mutex' || tgtType === 'mutex') {
-    return (srcType === 'goroutine' && tgtType === 'mutex') || (srcType === 'mutex' && tgtType === 'goroutine');
+export interface ConnectionCheck {
+  valid: boolean;
+  reason?: string;
+}
+
+export function validateConnection(
+  nodes: CanvasNode[],
+  edges: CanvasEdge[],
+  sourceId: string,
+  targetId: string,
+  ignoreEdgeId?: string
+): ConnectionCheck {
+  if (sourceId === targetId) {
+    return { valid: false, reason: 'Self connection impossible' };
   }
-  if (srcType === 'waitgroup' || tgtType === 'waitgroup') {
-    return (srcType === 'goroutine' && tgtType === 'waitgroup') || (srcType === 'waitgroup' && tgtType === 'goroutine');
+
+  const src = nodes.find((n) => n.id === sourceId);
+  const tgt = nodes.find((n) => n.id === targetId);
+  if (!src || !tgt) return { valid: false, reason: 'Node not found' };
+
+  // Правило 1: Дозволено лише Goroutine <-> Channel
+  const isCorrectPair =
+    (src.type === 'goroutine' && tgt.type === 'channel') ||
+    (src.type === 'channel' && tgt.type === 'goroutine');
+
+  if (!isCorrectPair) {
+    if (src.type === tgt.type) {
+      return {
+        valid: false,
+        reason: src.type === 'goroutine'
+          ? 'Direct Goroutine-to-Goroutine connection invalid in runtime'
+          : 'Direct Channel-to-Channel connection invalid in runtime'
+      };
+    }
+    return { valid: false, reason: 'Invalid connection type' };
   }
-  if (srcType === 'select' || tgtType === 'select') {
-    const allowed = ['goroutine', 'channel'];
-    return allowed.includes(srcType) && allowed.includes(tgtType) && srcType !== tgtType;
+
+  // Правило 2: Максимум 1 конектор між конкретною парою нод A та B
+  const alreadyConnected = edges.some(
+    (e) =>
+      e.id !== ignoreEdgeId &&
+      ((e.source === sourceId && e.target === targetId) ||
+        (e.source === targetId && e.target === sourceId))
+  );
+
+  if (alreadyConnected) {
+    return { valid: false, reason: 'Connector already exists between these nodes' };
   }
-  if (srcType === 'channel' && tgtType === 'channel') {
-    return false;
-  }
-  return true;
+
+  return { valid: true };
 }
 
 class CanvasStore {
@@ -35,51 +62,82 @@ class CanvasStore {
   activeTool = $state<CanvasTool>('pointer');
   isSimulating = $state(false);
 
+  constructor() {
+    this.initMainWorkspace();
+  }
+
   setTool(tool: CanvasTool) {
     this.activeTool = tool;
-    if (tool !== 'pointer' && tool !== 'connect') {
-      this.selectedNodeId = null;
-      this.selectedEdgeId = null;
-    }
+  }
+
+  initMainWorkspace() {
+    this.nodes = [];
+    this.edges = [];
+
+    const gMain: CanvasNode = {
+      id: 'goroutine-1',
+      type: 'goroutine',
+      position: { x: 120, y: 180 },
+      label: 'main.main',
+      goid: 1,
+      status: '_Grunning'
+    };
+
+    const mainChan: CanvasNode = {
+      id: 'channel-1',
+      type: 'channel',
+      position: { x: 420, y: 180 },
+      label: 'ch1',
+      capacity: 2,
+      elemType: 'string',
+      values: [],
+      closed: false
+    };
+
+    this.nodes = [gMain, mainChan];
+    this.addEdge('goroutine-1', 'channel-1', 'sudog_link');
+    this.selectNode('goroutine-1');
   }
 
   addNode(type: CanvasNodeType, position: { x: number; y: number }, label?: string): CanvasNode {
-    typeCounters[type]++;
-    const currentIndex = typeCounters[type];
+    const currentIndex = this.nodes.filter((n) => n.type === type).length + 1;
     const id = `${type}-${currentIndex}`;
-    const nodeLabel = label || `${type}-${currentIndex}`;
+    const nodeLabel = label || (type === 'goroutine' ? `G${currentIndex}` : `ch${currentIndex}`);
 
-    const base = {
-      id,
-      type,
-      position: { ...position },
-      label: nodeLabel,
-    };
-
+    const base = { id, type, position: { ...position }, label: nodeLabel };
     let node: CanvasNode;
-    switch (type) {
-      case 'goroutine':
-        node = { ...base, type: 'goroutine', goid: currentIndex, status: '_Grunnable', instructions: [] };
-        break;
-      case 'channel':
-        node = { ...base, type: 'channel', capacity: 2, values: [], closed: false };
-        break;
-      case 'mutex':
-        node = { ...base, type: 'mutex', locked: false, starving: false, waitersCount: 0 };
-        break;
-      case 'waitgroup':
-        node = { ...base, type: 'waitgroup', counter: 0, waiterCount: 0 };
-        break;
-      case 'select':
-        node = { ...base, type: 'select', cases: [] };
-        break;
-      default:
-        throw new Error(`Unknown node type: ${type}`);
+
+    if (type === 'goroutine') {
+      node = { ...base, type: 'goroutine', goid: currentIndex, status: '_Grunnable' };
+    } else {
+      node = { ...base, type: 'channel', capacity: 2, elemType: 'string', values: [], closed: false };
     }
 
     this.nodes = [...this.nodes, node];
     this.selectNode(id);
     return node;
+  }
+
+  setNodeLabel(id: string, label: string) {
+    this.nodes = this.nodes.map((n) => (n.id === id ? { ...n, label } : n));
+  }
+
+  setChannelCapacity(id: string, capacity: number) {
+    this.nodes = this.nodes.map((n) => {
+      if (n.id === id && n.type === 'channel') {
+        return { ...n, capacity: Math.max(0, capacity) };
+      }
+      return n;
+    });
+  }
+
+  setChannelElemType(id: string, elemType: ChannelElemType) {
+    this.nodes = this.nodes.map((n) => {
+      if (n.id === id && n.type === 'channel') {
+        return { ...n, elemType };
+      }
+      return n;
+    });
   }
 
   removeNode(id: string) {
@@ -89,98 +147,61 @@ class CanvasStore {
   }
 
   updatePosition(id: string, pos: { x: number; y: number }) {
-    this.nodes = this.nodes.map((n) => (n.id === id ? { ...n, position: pos } : n));
+	  const node = this.nodes.find((n) => n.id === id);
+	  if (node) {
+		// Точкова мутація властивостей у глибокому $state проксі Svelte 5
+		node.position.x = pos.x;
+		node.position.y = pos.y;
+	  }
   }
 
   selectNode(id: string | null) {
     this.selectedNodeId = id;
-    if (id !== null) {
-      this.selectedEdgeId = null;
-    }
+    if (id !== null) this.selectedEdgeId = null;
   }
 
   selectEdge(id: string | null) {
     this.selectedEdgeId = id;
-    if (id !== null) {
-      this.selectedNodeId = null;
-    }
+    if (id !== null) this.selectedNodeId = null;
   }
 
-  addEdge(sourceId: string, targetId: string, kind?: CanvasEdge['kind']): boolean {
-    if (sourceId === targetId) return false;
+  addEdge(sourceId: string, targetId: string, kind: CanvasEdge['kind'] = 'sudog_link'): boolean {
+    const check = validateConnection(this.nodes, this.edges, sourceId, targetId);
+    if (!check.valid) return false;
 
-    const src = this.getNode(sourceId);
-    const tgt = this.getNode(targetId);
-    if (!src || !tgt) return false;
-
-    if (!isValidConnection(src.type, tgt.type)) {
-      return false;
-    }
-
-    const exists = this.edges.some(
-      (e) => (e.source === sourceId && e.target === targetId) || (e.source === targetId && e.target === sourceId)
-    );
-    if (exists) return false;
-
-    let finalKind = kind;
-    if (!finalKind) {
-      if (tgt.type === 'mutex') finalKind = 'sync_lock';
-      else if (tgt.type === 'waitgroup') finalKind = 'context_signal';
-      else finalKind = 'data_flow';
-    }
-
-    const edgeId = `edge-${this.edges.length + 1}`;
-    const edge: CanvasEdge = {
-      id: edgeId,
-      sourceNodeId: sourceId,
-      targetNodeId: targetId,
-      source: sourceId,
-      target: targetId,
-      kind: finalKind,
-    };
+    const edgeId = `edge-${Date.now()}`;
+    const edge: CanvasEdge = { id: edgeId, sourceNodeId: sourceId, targetNodeId: targetId, source: sourceId, target: targetId, kind };
 
     this.edges = [...this.edges, edge];
     this.selectEdge(edge.id);
     return true;
   }
 
-  reconnectEdge(edgeId: string, end: 'source' | 'target', newNodeId: string): boolean {
-    const edge = this.edges.find((e) => e.id === edgeId);
+  reconnectEdge(edgeId: string, newSourceId?: string, newTargetId?: string): boolean {
+    const edge = this.getEdge(edgeId);
     if (!edge) return false;
 
-    const sourceId = end === 'source' ? newNodeId : edge.source;
-    const targetId = end === 'target' ? newNodeId : edge.target;
+    const source = newSourceId ?? edge.source;
+    const target = newTargetId ?? edge.target;
 
-    if (sourceId === targetId) return false;
-
-    const src = this.getNode(sourceId);
-    const tgt = this.getNode(targetId);
-    if (!src || !tgt) return false;
-
-    if (!isValidConnection(src.type, tgt.type)) return false;
+    const check = validateConnection(this.nodes, this.edges, source, target, edgeId);
+    if (!check.valid) return false;
 
     this.edges = this.edges.map((e) => {
-      if (e.id !== edgeId) return e;
-      return {
-        ...e,
-        sourceNodeId: sourceId,
-        targetNodeId: targetId,
-        source: sourceId,
-        target: targetId,
-      };
+      if (e.id === edgeId) {
+        return { ...e, sourceNodeId: source, targetNodeId: target, source, target };
+      }
+      return e;
     });
-    this.selectEdge(edgeId);
     return true;
   }
 
-  getEdge(id: string | null): CanvasEdge | null {
-    if (!id) return null;
-    return this.edges.find((e) => e.id === id) ?? null;
+  getNode(id: string | null): CanvasNode | null {
+    return id ? this.nodes.find((node) => node.id === id) ?? null : null;
   }
 
-  getNode(id: string | null): CanvasNode | null {
-    if (!id) return null;
-    return this.nodes.find((node) => node.id === id) ?? null;
+  getEdge(id: string | null): CanvasEdge | null {
+    return id ? this.edges.find((e) => e.id === id) ?? null : null;
   }
 
   removeEdge(id: string) {
@@ -193,10 +214,6 @@ class CanvasStore {
     this.edges = [];
     this.selectedNodeId = null;
     this.selectedEdgeId = null;
-
-    Object.keys(typeCounters).forEach((key) => {
-      typeCounters[key as CanvasNodeType] = 0;
-    });
   }
 }
 
