@@ -6,7 +6,9 @@ function getInitialTheme(): Theme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
     if (stored && ['dark', 'light', 'system'].includes(stored)) return stored;
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   return 'system';
 }
 
@@ -34,7 +36,9 @@ class ThemeStore {
     applyClass(this.effectiveTheme);
     try {
       localStorage.setItem(STORAGE_KEY, this.theme);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
 
   setTheme(next: Theme) {

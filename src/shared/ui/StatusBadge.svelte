@@ -1,7 +1,18 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  export type BadgeVariant = 'emerald' | 'amber' | 'cyan' | 'rose' | 'purple' | 'blue' | 'zinc' | 'orange' | 'teal' | 'pink' | 'lime';
+  export type BadgeVariant =
+    | 'emerald'
+    | 'amber'
+    | 'cyan'
+    | 'rose'
+    | 'purple'
+    | 'blue'
+    | 'zinc'
+    | 'orange'
+    | 'teal'
+    | 'pink'
+    | 'lime';
 
   interface Props {
     variant?: BadgeVariant;
@@ -25,6 +36,10 @@
   };
 </script>
 
-<span class="px-2 py-0.5 rounded text-[10px] font-bold border font-mono inline-flex items-center gap-1 {styles[variant]}">
+<span
+  class="px-2 py-0.5 rounded text-[10px] font-bold border font-mono inline-flex items-center gap-1 {styles[
+    variant
+  ]}"
+>
   {@render children()}
 </span>

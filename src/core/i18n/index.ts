@@ -1,2 +1,2 @@
-export { i18n } from './store.svelte.ts';
-export type { Lang } from './types';
+export { i18n } from './store.svelte';
+export type { Lang, Translations } from './types';

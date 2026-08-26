@@ -1,44 +1,46 @@
-import type { Lang } from './types';
-import { en } from './translations/en';
-import { uk } from './translations/uk';
+import { en } from './locales/en';
+import { uk } from './locales/uk';
+import type { Lang, Translations } from './types';
 
 const STORAGE_KEY = 'grs:lang';
 
-const dictionaries: Record<Lang, Record<string, string>> = {
-  en,
-  uk,
-};
+const translations: Record<Lang, Translations> = { en, uk };
 
 function getInitialLang(): Lang {
+  if (typeof window === 'undefined') return 'en';
   try {
     const stored = localStorage.getItem(STORAGE_KEY) as Lang | null;
     if (stored && (stored === 'en' || stored === 'uk')) return stored;
-  } catch { /* noop */ }
-  return 'uk';
+  } catch {
+    /* noop */
+  }
+  return 'en';
 }
 
 class I18nStore {
   lang = $state<Lang>(getInitialLang());
 
-  t(key: string, params?: Record<string, unknown>): string {
-    const dict = dictionaries[this.lang];
-    let text = dict[key] ?? dictionaries['en'][key] ?? key;
-
-    if (params && typeof text === 'string') {
-      Object.entries(params).forEach(([k, v]) => {
-        text = text.replaceAll(`{${k}}`, String(v));
-      });
-    }
-
-    return text;
-  }
-
   setLang(next: Lang) {
     this.lang = next;
     try {
       localStorage.setItem(STORAGE_KEY, next);
-    } catch { /* noop */ }
-    document.documentElement.lang = next;
+    } catch {
+      /* noop */
+    }
+  }
+
+  t(keyPath: string): string {
+    const current = translations[this.lang] || translations.en;
+    const keys = keyPath.split('.');
+    let obj: unknown = current;
+    for (const key of keys) {
+      if (obj && typeof obj === 'object' && key in obj) {
+        obj = (obj as Record<string, unknown>)[key];
+      } else {
+        return keyPath;
+      }
+    }
+    return typeof obj === 'string' ? obj : keyPath;
   }
 }
 

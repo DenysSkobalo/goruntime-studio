@@ -1,12 +1,13 @@
 <script lang="ts">
-  import type { CanvasNode, CanvasNodeType } from "$shared/types/nodes";
-  import CanvasNodeComponent from "./CanvasNode.svelte";
-  import { canvasStore, validateConnection } from "../model/canvas.store.svelte";
-  import CanvasEdge from "./CanvasEdge.svelte";
-  import CanvasEdgeOverlay from "./CanvasEdgeOverlay.svelte";
-  import { getToolBannerColor } from "../utils/colors";
-  import { stackModalStore } from "$shared/stores/stack-modal.store.svelte";
-  import { computeBezierPath, getBezierParams, getNodeAnchor } from "../utils/geometry";
+  import type { CanvasNode, CanvasNodeType } from '$shared/types/nodes';
+  import CanvasNodeComponent from './CanvasNode.svelte';
+  import { canvasStore, validateConnection } from '../model/canvas.store.svelte';
+  import CanvasEdge from './CanvasEdge.svelte';
+  import CanvasEdgeOverlay from './CanvasEdgeOverlay.svelte';
+  import { getToolBannerColor } from '../utils/colors';
+  import { stackModalStore } from '$shared/stores/stack-modal.store.svelte';
+  import { getNodeAnchor } from '../utils/geometry';
+  import { computeBezierPath, getBezierParams } from '../utils/svg-path';
 
   let viewportRef = $state<HTMLDivElement | null>(null);
 
@@ -38,7 +39,10 @@
     const activeTool = canvasStore.activeTool;
 
     if (activeTool !== 'pointer' && activeTool !== 'connect') {
-      canvasStore.addNode(activeTool as CanvasNodeType, { x: Math.max(10, coords.x - 72.5), y: Math.max(10, coords.y - 37) });
+      canvasStore.addNode(activeTool as CanvasNodeType, {
+        x: Math.max(10, coords.x - 72.5),
+        y: Math.max(10, coords.y - 37),
+      });
       canvasStore.setTool('pointer');
       return;
     }
@@ -47,6 +51,7 @@
     canvasStore.selectEdge(null);
     connectingSourceId = null;
     reconnectingEdgeId = null;
+    reconnectingEnd = null;
   }
 
   function handleNodePointerDown(e: PointerEvent, node: CanvasNode) {
@@ -55,9 +60,25 @@
 
     const coords = getCanvasCoordinates(e.clientX, e.clientY);
 
+    if (reconnectingEdgeId && reconnectingEnd) {
+      if (reconnectingEnd === 'source') {
+        canvasStore.reconnectEdge(reconnectingEdgeId, node.id, undefined);
+      } else if (reconnectingEnd === 'target') {
+        canvasStore.reconnectEdge(reconnectingEdgeId, undefined, node.id);
+      }
+      reconnectingEdgeId = null;
+      reconnectingEnd = null;
+      return;
+    }
+
     if (canvasStore.activeTool === 'connect') {
       if (connectingSourceId && connectingSourceId !== node.id) {
-        const check = validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId, node.id);
+        const check = validateConnection(
+          canvasStore.nodes,
+          canvasStore.edges,
+          connectingSourceId,
+          node.id,
+        );
         if (check.valid) {
           canvasStore.addEdge(connectingSourceId, node.id);
         }
@@ -74,7 +95,6 @@
     draggedNodeId = node.id;
     dragOffset = { x: coords.x - node.position.x, y: coords.y - node.position.y };
 
-    // Реєстрація глобальних слухачів для ідеально плавної траєкторії руху
     window.addEventListener('pointermove', handleWindowPointerMove, { passive: true });
     window.addEventListener('pointerup', handleWindowPointerUp);
   }
@@ -93,24 +113,44 @@
           canvasStore.updatePosition(draggedNodeId, { x: nextX, y: nextY });
         }
 
+        if (reconnectingEdgeId || canvasStore.activeTool === 'connect') {
+          const elem = document.elementFromPoint(e.clientX, e.clientY);
+          const nodeEl = elem?.closest('[data-node-id]');
+          hoveredNodeId = nodeEl ? nodeEl.getAttribute('data-node-id') : null;
+        }
+
         isTicking = false;
       });
     }
   }
 
-  function handleWindowPointerUp() {
+  function handleWindowPointerUp(e: PointerEvent) {
+    if (reconnectingEdgeId && reconnectingEnd) {
+      const elem = document.elementFromPoint(e.clientX, e.clientY);
+      const targetNodeId =
+        elem?.closest('[data-node-id]')?.getAttribute('data-node-id') || hoveredNodeId;
+
+      if (targetNodeId) {
+        if (reconnectingEnd === 'source') {
+          canvasStore.reconnectEdge(reconnectingEdgeId, targetNodeId, undefined);
+        } else if (reconnectingEnd === 'target') {
+          canvasStore.reconnectEdge(reconnectingEdgeId, undefined, targetNodeId);
+        }
+      }
+      reconnectingEdgeId = null;
+      reconnectingEnd = null;
+    }
+
     if (isDraggingNode) {
       isDraggingNode = false;
       draggedNodeId = null;
-      window.removeEventListener('pointermove', handleWindowPointerMove);
-      window.removeEventListener('pointerup', handleWindowPointerUp);
     }
-    reconnectingEdgeId = null;
-    reconnectingEnd = null;
+
+    window.removeEventListener('pointermove', handleWindowPointerMove);
+    window.removeEventListener('pointerup', handleWindowPointerUp);
   }
 
   function handleViewportPointerMove(e: PointerEvent) {
-    // Оновлення курсора та hoveredState поза активним драгуванням
     if (!isDraggingNode) {
       const coords = getCanvasCoordinates(e.clientX, e.clientY);
       mousePos = coords;
@@ -122,7 +162,18 @@
 
   function handleKeyDown(e: KeyboardEvent) {
     const target = e.target as HTMLElement;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+
+    // Запобігаємо перехопленню системних гарячих клавіш (Cmd+C, Ctrl+C, Cmd+V тощо)
+    if (e.ctrlKey || e.metaKey || e.altKey) {
       return;
     }
 
@@ -154,7 +205,12 @@
       const selectedNode = canvasStore.getNode(canvasStore.selectedNodeId);
       const goid = selectedNode && selectedNode.type === 'goroutine' ? selectedNode.goid : 1;
       stackModalStore.open(goid);
-    } else if (e.code === 'Delete' || e.code === 'Backspace' || e.key === 'Delete' || e.key === 'Backspace') {
+    } else if (
+      e.code === 'Delete' ||
+      e.code === 'Backspace' ||
+      e.key === 'Delete' ||
+      e.key === 'Backspace'
+    ) {
       e.preventDefault();
       if (canvasStore.selectedNodeId) {
         canvasStore.removeNode(canvasStore.selectedNodeId);
@@ -179,7 +235,12 @@
 
       let isHoverValid = false;
       if (hoveredNodeId && hoveredNodeId !== connectingSourceId) {
-        isHoverValid = validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId, hoveredNodeId).valid;
+        isHoverValid = validateConnection(
+          canvasStore.nodes,
+          canvasStore.edges,
+          connectingSourceId,
+          hoveredNodeId,
+        ).valid;
       }
       return { srcNode, isHoverValid };
     }
@@ -196,7 +257,13 @@
 
       let isHoverValid = false;
       if (hoveredNodeId && hoveredNodeId !== fixedNodeId) {
-        isHoverValid = validateConnection(canvasStore.nodes, canvasStore.edges, fixedNodeId, hoveredNodeId, edge.id).valid;
+        isHoverValid = validateConnection(
+          canvasStore.nodes,
+          canvasStore.edges,
+          reconnectingEnd === 'source' ? hoveredNodeId : fixedNodeId,
+          reconnectingEnd === 'source' ? fixedNodeId : hoveredNodeId,
+          edge.id,
+        ).valid;
       }
       return { fixedNode, isHoverValid };
     }
@@ -216,8 +283,14 @@
   onpointermove={handleViewportPointerMove}
 >
   {#if canvasStore.activeTool !== 'pointer'}
-    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full text-xs font-mono text-white font-semibold shadow-xl backdrop-blur-md border border-white/10 flex items-center gap-2 pointer-events-none {getToolBannerColor(canvasStore.activeTool)}">
-      <span>Tool: <strong>{canvasStore.activeTool.toUpperCase()}</strong> (Press ESC to cancel)</span>
+    <div
+      class="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full text-xs font-mono text-white font-semibold shadow-xl backdrop-blur-md border border-white/10 flex items-center gap-2 pointer-events-none {getToolBannerColor(
+        canvasStore.activeTool,
+      )}"
+    >
+      <span
+        >Tool: <strong>{canvasStore.activeTool.toUpperCase()}</strong> (Press ESC to cancel)</span
+      >
     </div>
   {/if}
 
@@ -240,14 +313,18 @@
     {#if activeConnectionState}
       {@const sAnchor = getNodeAnchor(activeConnectionState.srcNode, mousePos)}
       {@const bezierParams = getBezierParams({
-        sx: sAnchor.x, sy: sAnchor.y, sideS: sAnchor.side,
-        tx: mousePos.x, ty: mousePos.y, sideT: sAnchor.side === 'left' ? 'right' : 'left'
+        sx: sAnchor.x,
+        sy: sAnchor.y,
+        sideS: sAnchor.side,
+        tx: mousePos.x,
+        ty: mousePos.y,
+        sideT: sAnchor.side === 'left' ? 'right' : 'left',
       })}
       <path
         d={computeBezierPath(bezierParams)}
         fill="none"
-        stroke={activeConnectionState.isHoverValid ? "#f59e0b" : "#ef4444"}
-        stroke-width={activeConnectionState.isHoverValid ? "3" : "2"}
+        stroke={activeConnectionState.isHoverValid ? '#f59e0b' : '#ef4444'}
+        stroke-width={activeConnectionState.isHoverValid ? '3' : '2'}
         stroke-dasharray="6 6"
       />
     {/if}
@@ -255,13 +332,17 @@
     {#if activeReconnectState}
       {@const fAnchor = getNodeAnchor(activeReconnectState.fixedNode, mousePos)}
       {@const bezierParams = getBezierParams({
-        sx: fAnchor.x, sy: fAnchor.y, sideS: fAnchor.side,
-        tx: mousePos.x, ty: mousePos.y, sideT: fAnchor.side === 'left' ? 'right' : 'left'
+        sx: fAnchor.x,
+        sy: fAnchor.y,
+        sideS: fAnchor.side,
+        tx: mousePos.x,
+        ty: mousePos.y,
+        sideT: fAnchor.side === 'left' ? 'right' : 'left',
       })}
       <path
         d={computeBezierPath(bezierParams)}
         fill="none"
-        stroke={activeReconnectState.isHoverValid ? "#f59e0b" : "#ef4444"}
+        stroke={activeReconnectState.isHoverValid ? '#f59e0b' : '#ef4444'}
         stroke-width="3"
         stroke-dasharray="4 4"
       />
@@ -273,14 +354,29 @@
       {@const isSelected = canvasStore.selectedNodeId === node.id}
       {@const isConnecting = canvasStore.activeTool === 'connect' && connectingSourceId !== null}
       {@const isReconnecting = reconnectingEdgeId !== null}
-      
-      {@const isValidTarget = (isConnecting || isReconnecting) && node.id !== (connectingSourceId || reconnectingEdgeId) && (
-        isConnecting ? validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId!, node.id).valid
-        : isReconnecting ? validateConnection(canvasStore.nodes, canvasStore.edges, reconnectingEnd === 'source' ? canvasStore.getEdge(reconnectingEdgeId!)!.target : canvasStore.getEdge(reconnectingEdgeId!)!.source, node.id, reconnectingEdgeId!).valid
-        : false
-      )}
 
-      {@const isInvalidTarget = (isConnecting || isReconnecting) && node.id !== (connectingSourceId || reconnectingEdgeId) && !isValidTarget}
+      {@const isValidTarget =
+        (isConnecting || isReconnecting) &&
+        node.id !== (connectingSourceId || reconnectingEdgeId) &&
+        (isConnecting
+          ? validateConnection(canvasStore.nodes, canvasStore.edges, connectingSourceId!, node.id)
+              .valid
+          : isReconnecting
+            ? validateConnection(
+                canvasStore.nodes,
+                canvasStore.edges,
+                reconnectingEnd === 'source'
+                  ? canvasStore.getEdge(reconnectingEdgeId!)!.target
+                  : canvasStore.getEdge(reconnectingEdgeId!)!.source,
+                node.id,
+                reconnectingEdgeId!,
+              ).valid
+            : false)}
+
+      {@const isInvalidTarget =
+        (isConnecting || isReconnecting) &&
+        node.id !== (connectingSourceId || reconnectingEdgeId) &&
+        !isValidTarget}
 
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="pointer-events-auto inline-block">

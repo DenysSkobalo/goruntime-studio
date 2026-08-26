@@ -1,23 +1,19 @@
 {
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
     "paths": {
-      "$lib/*": ["./src/shared/*"],
-      "$core/*": ["./src/core/*"],
-      "$features/*": ["./src/features/*"],
-      "$shared/*": ["./src/shared/*"],
-      "$app/*": ["./src/app/*"]
+      "$lib/*": ["src/lib/*"],
+      "$core/*": ["src/core/*"],
+      "$features/*": ["src/features/*"],
+      "$shared/*": ["src/shared/*"],
+      "$app/*": ["src/app/*"]
     }
-  },
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".svelte-kit",
-    ".output",
-    "public",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ]
+  }
 }

@@ -1,131 +1,101 @@
-export const PAGE_SIZE = 8192; // 8 KB Page
-export const MAX_SMALL_SIZE = 32768; // 32 KB Limit for MCache
-export const HEAP_ARENA_START = 0x00c000000000;
+import { formatHex } from './layout';
 
-// Таблиця 67 класів розмірів Go Runtime (вибірка основних)
-export const SIZE_CLASSES = [
-  0, 8, 16, 24, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256,
-  320, 384, 448, 512, 1024, 2048, 4096, 8192, 16384, 32768
-];
-
-export interface MSpan {
-  startAddr: number;      // Початкова Hex-адреса спану у віртуальній арені
-  npages: number;         // Кількість 8KB сторінок
-  spanclass: number;      // (sizeclass << 1) | (noscan ? 1 : 0)
-  elemsize: number;       // Розмір одного елемента в байтах
-  nelems: number;         // Загальна кількість елементів у спані
-  allocCount: number;     // Кількість виділених елементів
-  allocBits: boolean[];   // Бітова карта виділених слотів
-  gcmarkBits: boolean[];  // Бітова карта триколірного маркування GC
+export interface Span {
+  classId: number;
+  objSize: number;
+  npages: number;
+  startAddr: bigint;
+  freeIndex: number;
+  nelems: number;
 }
 
-export interface MCache {
-  alloc: Record<number, MSpan | null>; // 67 classes * 2 (scan/noscan) = 134 span-слоти
-}
-
-export interface MCentral {
-  spanclass: number;
-  nonempty: MSpan[]; // Спани з вільними об'єктами
-  empty: MSpan[];    // Повністю заповнені спани
-}
-
+/**
+ * @todo Issue #MEMORY-302: Connect memory primitives to visual timeline stream.
+ * Connect GoHeapAllocator (mcache -> mcentral -> mheap) and GarbageCollector (Tri-color marking)
+ * to timeline.store.svelte.ts for real-time heap frame animation and mark-sweep visualization.
+ */
 export class GoHeapAllocator {
-  private arenaNextAddr = HEAP_ARENA_START;
-  public mheapPages: Map<number, MSpan> = new Map();
-  public centrals: Map<number, MCentral> = new Map();
+  private static instance: GoHeapAllocator;
 
-  constructor() {
-    this.initCentrals();
+  // Tiny allocator state
+  private tiny: bigint = 0n;
+  private tinyoffset: number = 0;
+  private tinyAllocsCount: number = 0;
+
+  // mcache simulated spans by size class
+  private mcacheSpans: Map<number, Span> = new Map();
+
+  private constructor() {
+    this.initMCache();
   }
 
-  private initCentrals(): void {
-    for (let sc = 0; sc < SIZE_CLASSES.length * 2; sc++) {
-      this.centrals.set(sc, { spanclass: sc, nonempty: [], empty: [] });
+  public static getInstance(): GoHeapAllocator {
+    if (!GoHeapAllocator.instance) {
+      GoHeapAllocator.instance = new GoHeapAllocator();
     }
+    return GoHeapAllocator.instance;
   }
 
-  public createMCache(): MCache {
-    const cache: MCache = { alloc: {} };
-    for (let sc = 0; sc < SIZE_CLASSES.length * 2; sc++) {
-      cache.alloc[sc] = null;
-    }
-    return cache;
+  private initMCache(): void {
+    // Standard Go size classes initialization (example subsets: class 1 = 8B, class 2 = 16B, class 3 = 32B)
+    this.mcacheSpans.set(1, { classId: 1, objSize: 8, npages: 1, startAddr: 0xc000100000n, freeIndex: 0, nelems: 1024 });
+    this.mcacheSpans.set(2, { classId: 2, objSize: 16, npages: 1, startAddr: 0xc000102000n, freeIndex: 0, nelems: 512 });
+    this.mcacheSpans.set(3, { classId: 3, objSize: 32, npages: 1, startAddr: 0xc000104000n, freeIndex: 0, nelems: 256 });
   }
 
-  /**
-   * Головна функція виділення пам'яті у купі (runtime.mallocgc)
-   */
-  public mallocgc(size: number, scan: boolean, mcache: MCache): { address: string; spanclass: number } {
-    if (size === 0) return { address: '0x000000000000', spanclass: 0 };
-
-    // 1. Large Allocation (> 32 KB): Виділення напряму з mheap без MCache
-    if (size > MAX_SMALL_SIZE) {
-      const npages = Math.ceil(size / PAGE_SIZE);
-      const span = this.allocLargeSpan(npages);
-      return { address: `0x${span.startAddr.toString(16)}`, spanclass: 0 };
+  public allocate(size: number, needsZeroing: boolean = true): { address: string; level: 'tiny' | 'mcache' | 'mcentral' | 'mheap'; explanation: string } {
+    // 1. Tiny Allocator (< 16 bytes, noscan)
+    if (size < 16) {
+      if (this.tinyoffset + size <= 16 && this.tiny !== 0n) {
+        const addr = this.tiny + BigInt(this.tinyoffset);
+        this.tinyoffset += size;
+        this.tinyAllocsCount++;
+        return {
+          address: formatHex(addr),
+          level: 'tiny',
+          explanation: `mallocgc(): Використано Tiny Allocator (розмір ${size}B). Об'єднано у загальний слот mcache.tiny (offset: ${this.tinyoffset}B).`,
+        };
+      } else {
+        // Allocate a new 16-byte block for tiny allocator
+        const span = this.mcacheSpans.get(2)!;
+        this.tiny = span.startAddr + BigInt(span.freeIndex * span.objSize);
+        span.freeIndex++;
+        this.tinyoffset = size;
+        this.tinyAllocsCount++;
+        return {
+          address: formatHex(this.tiny),
+          level: 'tiny',
+          explanation: `mallocgc(): Виділено новий 16B блок у mcache для Tiny Allocator. Зайнято ${size}B.`,
+        };
+      }
     }
 
-    // 2. Small Allocation (<= 32 KB): Пошук належного Size Class
-    const sizeclass = SIZE_CLASSES.findIndex((s) => s >= size) || 1;
-    const spanclass = (sizeclass << 1) | (scan ? 0 : 1);
-    const elemsize = SIZE_CLASSES[sizeclass];
+    // 2. Small Allocation (<= 32KB) -> mcache
+    const classId = this.getSizeClass(size);
+    const span = this.mcacheSpans.get(classId);
 
-    // 3. Перевірка локального кешу MCache
-    let span = mcache.alloc[spanclass];
-
-    if (!span || span.allocCount >= span.nelems) {
-      // MCache Cache Miss -> Виклики runtime.mcacheRefill та запит з MCentral
-      span = this.refillMCache(mcache, spanclass, elemsize);
-    }
-
-    // 4. Пошук першого вільного слота через allocBits
-    const freeIndex = span.allocBits.findIndex((allocated) => !allocated);
-    span.allocBits[freeIndex] = true;
-    span.allocCount++;
-
-    const objAddr = span.startAddr + freeIndex * elemsize;
-    return { address: `0x${objAddr.toString(16)}`, spanclass };
-  }
-
-  private refillMCache(mcache: MCache, spanclass: number, elemsize: number): MSpan {
-    const central = this.centrals.get(spanclass)!;
-
-    if (central.nonempty.length === 0) {
-      // MCentral порожній -> Запит нової сторінки 8KB з mheap
-      const npages = 1;
-      const newSpan: MSpan = {
-        startAddr: this.arenaNextAddr,
-        npages,
-        spanclass,
-        elemsize,
-        nelems: Math.floor((npages * PAGE_SIZE) / elemsize),
-        allocCount: 0,
-        allocBits: new Array(Math.floor((npages * PAGE_SIZE) / elemsize)).fill(false),
-        gcmarkBits: new Array(Math.floor((npages * PAGE_SIZE) / elemsize)).fill(false),
+    if (span && span.freeIndex < span.nelems) {
+      const addr = span.startAddr + BigInt(span.freeIndex * span.objSize);
+      span.freeIndex++;
+      return {
+        address: formatHex(addr),
+        level: 'mcache',
+        explanation: `mallocgc(): Виділено через mcache (Size Class ${classId}, objSize: ${span.objSize}B). Локальний потік P виділив пам'ять без блокувань (lock-free).`,
       };
-
-      this.arenaNextAddr += npages * PAGE_SIZE;
-      central.nonempty.push(newSpan);
     }
 
-    const span = central.nonempty.pop()!;
-    mcache.alloc[spanclass] = span;
-    return span;
+    // 3. Large Allocation (> 32KB or full mcache span) -> mcentral / mheap fallback
+    const heapAddr = 0xc000800000n + BigInt(Math.floor(Math.random() * 0x10000));
+    return {
+      address: formatHex(heapAddr),
+      level: 'mheap',
+      explanation: `mallocgc(): mcache span вичерпано. Запит до mcentral/mheap на виділення сторінок (sysAlloc/mmap).`,
+    };
   }
 
-  private allocLargeSpan(npages: number): MSpan {
-    const startAddr = this.arenaNextAddr;
-    this.arenaNextAddr += npages * PAGE_SIZE;
-
-    return {
-      startAddr,
-      npages,
-      spanclass: 0,
-      elemsize: npages * PAGE_SIZE,
-      nelems: 1,
-      allocCount: 1,
-      allocBits: [true],
-      gcmarkBits: [false],
-    };
+  private getSizeClass(size: number): number {
+    if (size <= 8) return 1;
+    if (size <= 16) return 2;
+    return 3;
   }
 }

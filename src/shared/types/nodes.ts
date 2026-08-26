@@ -1,15 +1,18 @@
+/**
+ * @todo Issue #CANVAS-101: Expand CanvasNodeType for core synchronization primitives.
+ * Target primitives to be implemented in future tasks:
+ * - 'mutex' (sync.Mutex)
+ * - 'waitgroup' (sync.WaitGroup)
+ * - 'context' (context.Context)
+ * - 'select' (selectgo)
+ * - 'atomic'
+ */
 export type CanvasNodeType = 'goroutine' | 'channel';
 
-export type GoroutineStatus = '_Gidle' | '_Grunnable' | '_Grunning' | '_Gsyscall' | '_Gwaiting' | '_Gdead';
+export type GoroutineStatus =
+  '_Gidle' | '_Grunnable' | '_Grunning' | '_Gsyscall' | '_Gwaiting' | '_Gdead';
 
 export type ChannelElemType = 'string' | 'int64' | 'bool' | 'struct{}';
-
-export const ELEM_SIZE_MAP: Record<ChannelElemType, number> = {
-  'string': 16,
-  'int64': 8,
-  'bool': 1,
-  'struct{}': 0,
-};
 
 export interface BaseCanvasNode {
   id: string;

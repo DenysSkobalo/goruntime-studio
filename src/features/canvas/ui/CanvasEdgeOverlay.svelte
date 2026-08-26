@@ -1,18 +1,21 @@
 <script lang="ts">
-  import { X } from 'lucide-svelte';
-  import { getNodeAnchor, getBezierParams, computeBezierMidpoint } from '../utils/geometry';
+  import { X } from '@lucide/svelte';
+  import type { CanvasEdge, CanvasNode } from '$shared/types/nodes';
+  import { getNodeAnchor } from '../utils/geometry';
+  import { getBezierParams, computeBezierMidpoint } from '../utils/svg-path';
 
   interface Props {
-    edge: any;
-    srcNode: any;
-    tgtNode: any;
+    edge: CanvasEdge;
+    srcNode: CanvasNode;
+    tgtNode: CanvasNode;
     isSelected: boolean;
     isReconnecting: boolean;
     onRemove: (edgeId: string) => void;
     onStartReconnect: (e: PointerEvent, edgeId: string, end: 'source' | 'target') => void;
   }
 
-  let { edge, srcNode, tgtNode, isSelected, isReconnecting, onRemove, onStartReconnect }: Props = $props();
+  let { edge, srcNode, tgtNode, isSelected, isReconnecting, onRemove, onStartReconnect }: Props =
+    $props();
 
   let coords = $derived.by(() => {
     if (!srcNode || !tgtNode) return null;
@@ -22,7 +25,14 @@
     const sAnchor = getNodeAnchor(srcNode, tgtCenter);
     const tAnchor = getNodeAnchor(tgtNode, srcCenter);
 
-    return { sx: sAnchor.x, sy: sAnchor.y, sideS: sAnchor.side, tx: tAnchor.x, ty: tAnchor.y, sideT: tAnchor.side };
+    return {
+      sx: sAnchor.x,
+      sy: sAnchor.y,
+      sideS: sAnchor.side,
+      tx: tAnchor.x,
+      ty: tAnchor.y,
+      sideT: tAnchor.side,
+    };
   });
 
   let bezierParams = $derived(coords ? getBezierParams(coords) : null);

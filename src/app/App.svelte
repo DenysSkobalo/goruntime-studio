@@ -1,57 +1,41 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import '../app.css';
-  import Workspace from './views/Workspace.svelte';
-  import { i18n } from '$core/i18n';
-  import { themeStore } from '$core/theme/store.svelte';
+  import Workspace from '$app/views/Workspace.svelte';
   import DocsView from '$features/docs/ui/DocsView.svelte';
-  import SettingsModal from '$shared/ui/SettingsModal.svelte';
 
-  let currentRoute = $state<'workspace' | 'docs'>('workspace');
+  type ViewMode = 'workspace' | 'docs';
 
-  function updateRoute() {
-    const path = window.location.pathname;
+  let currentView = $state<ViewMode>('workspace');
+
+  function syncRouteFromHash() {
     const hash = window.location.hash;
-    if (path === '/docs' || hash.startsWith('#docs')) {
-      currentRoute = 'docs';
+    if (hash.startsWith('#docs')) {
+      currentView = 'docs';
     } else {
-      currentRoute = 'workspace';
+      currentView = 'workspace';
+    }
+  }
+
+  function navigateTo(view: ViewMode) {
+    currentView = view;
+    if (view === 'docs') {
+      window.location.hash = '#docs';
+    } else {
+      window.location.hash = '';
     }
   }
 
   onMount(() => {
-    document.documentElement.lang = i18n.lang;
-    themeStore.sync();
-    updateRoute();
-
-    window.addEventListener('popstate', updateRoute);
-    window.addEventListener('hashchange', updateRoute);
-
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (themeStore.theme === 'system') {
-        themeStore.sync();
-      }
-    };
-    mql.addEventListener('change', handler);
-
-    return () => {
-      window.removeEventListener('popstate', updateRoute);
-      window.removeEventListener('hashchange', updateRoute);
-      mql.removeEventListener('change', handler);
-    };
+    syncRouteFromHash();
+    window.addEventListener('hashchange', syncRouteFromHash);
+    return () => window.removeEventListener('hashchange', syncRouteFromHash);
   });
-
-  function navigateToWorkspace() {
-    window.history.pushState({}, '', '/');
-    currentRoute = 'workspace';
-  }
 </script>
 
-{#if currentRoute === 'docs'}
-  <DocsView onBack={navigateToWorkspace} />
-{:else}
-  <Workspace />
-{/if}
-
-<SettingsModal />
+<div class="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col font-sans">
+  {#if currentView === 'docs'}
+    <DocsView onBack={() => navigateTo('workspace')} />
+  {:else}
+    <Workspace />
+  {/if}
+</div>
