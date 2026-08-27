@@ -1,6 +1,15 @@
 <script lang="ts">
+  /**
+   * @file src/shared/ui/StatusBadge.svelte
+   * @module shared/ui/StatusBadge
+   *
+   * @architecture Reusable Primitive Status Badge Component
+   * @description Styled status pill displaying Goroutine execution states (`_Grunning`, `_Gwaiting`, `_Grunnable`)
+   * and node types with color-coded Tailwind visual variants.
+   */
   import type { Snippet } from 'svelte';
 
+  /** Supported status badge color variant identifiers. */
   export type BadgeVariant =
     | 'emerald'
     | 'amber'
@@ -14,13 +23,20 @@
     | 'pink'
     | 'lime';
 
+  /**
+   * Status badge props contract.
+   * ANCHOR: STATUS_BADGE_PROPS
+   */
   interface Props {
+    /** Theme color variant identifier string. */
     variant?: BadgeVariant;
+    /** Svelte 5 children content snippet. */
     children: Snippet;
   }
 
   let { variant = 'zinc', children }: Props = $props();
 
+  /** Color variant CSS class lookup dictionary mapping. ANCHOR: BADGE_STYLES_MAP */
   const styles: Record<BadgeVariant, string> = {
     emerald: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     amber: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
@@ -36,6 +52,7 @@
   };
 </script>
 
+<!-- ANCHOR: STATUS_BADGE_ELEMENT -->
 <span
   class="px-2 py-0.5 rounded text-[10px] font-bold border font-mono inline-flex items-center gap-1 {styles[
     variant

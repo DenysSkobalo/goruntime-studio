@@ -1,14 +1,40 @@
 <script lang="ts">
+  /**
+   * @file src/features/canvas/ui/CanvasNode.svelte
+   * @module features/canvas/ui/CanvasNode
+   *
+   * @architecture Interactive Visual Canvas Node Component
+   * @description Renders individual Go runtime concurrency primitives (Goroutines and Channels) on the interactive 2D layout canvas.
+   *
+   * @remarks
+   * **Reactivity & Styling Mechanics:**
+   * Uses Svelte 5 `$derived` and `$derived.by` runes to dynamically compute selection highlights, connection validity state,
+   * target drop animations, and channel buffer slot occupancy visualization.
+   *
+   * @see {@link CanvasNode} Primitive data model contract.
+   * @see {@link https://github.com/golang/go/blob/master/src/runtime/runtime2.go Go `g` and `hchan` Data Structures}
+   */
   import { Network, Database } from '@lucide/svelte';
   import type { CanvasNode, ChannelNode, GoroutineNode } from '$shared/types/nodes';
 
+  /**
+   * Node component input props contract.
+   * ANCHOR: NODE_PROPS
+   */
   interface Props {
+    /** Canvas node metadata model instance. */
     node: CanvasNode;
+    /** Selection status boolean. */
     isSelected: boolean;
+    /** Connection tool active source flag. */
     isConnectSource: boolean;
+    /** Valid connection drop target flag. */
     isValidTarget: boolean;
+    /** Invalid connection target flag. */
     isInvalidTarget: boolean;
+    /** Pointer down drag event handler. */
     onPointerDown: (e: PointerEvent) => void;
+    /** Pointer up event handler. */
     onPointerUp: (e: PointerEvent) => void;
   }
 
@@ -22,8 +48,23 @@
     onPointerUp,
   }: Props = $props();
 
+  /**
+   * Indicates whether the node represents a Go execution routine (`g`).
+   * ANCHOR: NODE_TYPE_CHECK
+   */
   const isGoroutine = $derived(node.type === 'goroutine');
 
+  /**
+   * Computes dynamic Tailwind border, background, and shadow class combinations based on node selection and drag status.
+   *
+   * ANCHOR: SELECTION_RING_RESOLVER
+   *
+   * @remarks
+   * **Why emerald vs cyan palette distinction:**
+   * Emerald (#10b981) represents active Goroutine execution contexts (`g`), matching Go green branding accents.
+   * Cyan (#06b6d4) represents synchronization channels (`hchan`), providing distinct high-contrast visual separation
+   * between active execution threads and memory buffer queues.
+   */
   const cardStyle = $derived.by(() => {
     if (isInvalidTarget) {
       return 'border-rose-500/80 bg-rose-950/40 shadow-[0_0_15px_rgba(244,63,94,0.4)] opacity-60 cursor-not-allowed';
@@ -46,6 +87,9 @@
       : 'border-cyan-500/40 hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.35)]';
   });
 
+  /**
+   * Keyboard event interceptor preventing unintended canvas hotkey execution during keyboard navigation.
+   */
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.stopPropagation();
@@ -55,6 +99,10 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+<!-- 
+  ANCHOR: NODE_CONTAINER
+  Positioned absolute with hardware-accelerated transform translate3d to guarantee smooth 60fps dragging performance.
+-->
 <div
   class="absolute top-0 left-0 select-none cursor-grab active:cursor-grabbing"
   style="transform: translate3d({node.position.x}px, {node.position.y}px, 0); z-index: 10;"
@@ -86,6 +134,7 @@
 
     {#if isGoroutine}
       {@const g = node as GoroutineNode}
+      <!-- ANCHOR: GOROUTINE_STATUS_BADGE -->
       <div class="flex items-center justify-between text-[10px]">
         <span class="text-zinc-500">G{g.goid}</span>
         <span
@@ -96,6 +145,7 @@
       </div>
     {:else}
       {@const ch = node as ChannelNode}
+      <!-- ANCHOR: CHANNEL_BUFFER_SLOTS -->
       {#if ch.capacity <= 6}
         <div class="flex items-center gap-1 mt-1">
           {#each Array(Math.max(ch.capacity, 1)) as _, i}
@@ -107,6 +157,7 @@
           {/each}
         </div>
       {:else}
+        <!-- ANCHOR: CHANNEL_BUFFER_PROGRESS_BAR -->
         <div class="space-y-1 mt-1">
           <div
             class="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden border border-zinc-700/50"

@@ -1,4 +1,19 @@
 <script lang="ts">
+  /**
+   * @file src/features/inspector/ui/StackModal.svelte
+   * @module features/inspector/ui/StackModal
+   *
+   * @architecture Visual Stack & Heap Memory Modal Inspector Component
+   * @description Modal dialog rendering virtual stack frames, stack boundaries (`stack.hi`, `stack.lo`),
+   * stack pointer (`sched.sp`), stack split guard limits, and virtual heap allocations.
+   *
+   * @remarks
+   * **Stack Frame Allocation & Direction:**
+   * Stack frames grow downward in memory (from `stack.hi` towards `stack.lo`). Stack Split guard (`stackguard0`)
+   * prevents stack overflow by triggering dynamic stack allocation when $SP \le \text{stackguard0}$.
+   *
+   * @see {@link GoStackManager} Virtual stack frame generation engine.
+   */
   import Modal from '$shared/ui/Modal.svelte';
   import { stackModalStore } from '$shared/stores/stack-modal.store.svelte';
   import { formatHex, getGoroutineStack, getRawBaseAddress } from '$core/memory/layout';
@@ -6,10 +21,14 @@
   import { i18n } from '$core/i18n';
   import { Layers, Cpu, HardDrive, ArrowDown, Binary, ShieldAlert, Database } from '@lucide/svelte';
 
+  /** Currently selected Goroutine ID. ANCHOR: SELECTED_GOID_DERIVED */
   let selectedGoid = $derived(stackModalStore.selectedGoid);
+  /** Stack memory boundary descriptors. ANCHOR: STACK_MEM_DERIVED */
   let stack = $derived(getGoroutineStack(selectedGoid));
+  /** Calculated stack frames list for visualization. ANCHOR: STACK_FRAMES_DERIVED */
   let stackFrames = $derived(GoStackManager.getVirtualStackFrames(stack.stackLo, stack.elemAddr));
 
+  /** Localized modal subtitle formatting. */
   let formattedSubtitle = $derived(
     i18n
       .t('stackModal.subtitle')
@@ -27,7 +46,7 @@
   onClose={() => stackModalStore.close()}
 >
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 font-mono text-xs">
-    <!-- Stack Arena -->
+    <!-- ANCHOR: STACK_ARENA -->
     <div class="space-y-3">
       <div
         class="flex items-center justify-between text-xs font-bold text-emerald-400 uppercase tracking-wider"
@@ -42,6 +61,7 @@
       <div
         class="glow-card p-3.5 space-y-3 border border-zinc-800 bg-zinc-900/60 rounded-xl relative"
       >
+        <!-- ANCHOR: STACK_HIGH_BOUNDARY -->
         <div
           class="flex justify-between items-center bg-zinc-950 px-3 py-1.5 rounded-lg border border-emerald-500/30 text-[11px]"
         >
@@ -53,6 +73,7 @@
           <ArrowDown class="w-4 h-4 text-emerald-500/60 animate-bounce" />
         </div>
 
+        <!-- ANCHOR: STACK_FRAMES_LIST -->
         <div class="space-y-2">
           {#each stackFrames as frame}
             <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-1.5">
@@ -74,6 +95,7 @@
           {/each}
         </div>
 
+        <!-- ANCHOR: STACK_POINTER -->
         <div
           class="flex justify-between items-center bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/40 text-[11px]"
         >
@@ -84,6 +106,7 @@
           <span class="text-amber-300 font-bold">{formatHex(stack.schedSp)}</span>
         </div>
 
+        <!-- ANCHOR: STACK_GUARD -->
         <div
           class="flex justify-between items-center bg-rose-950/30 px-3 py-1 rounded-lg border border-rose-500/30 text-[10px]"
         >
@@ -93,6 +116,7 @@
           <span class="text-rose-300">{formatHex(stack.stackLo + 256n)}</span>
         </div>
 
+        <!-- ANCHOR: STACK_LOW_BOUNDARY -->
         <div
           class="flex justify-between items-center bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-800 text-[11px]"
         >
@@ -102,7 +126,7 @@
       </div>
     </div>
 
-    <!-- Virtual Heap Arena -->
+    <!-- ANCHOR: VIRTUAL_HEAP_ARENA -->
     <div class="space-y-3">
       <div
         class="flex items-center justify-between text-xs font-bold text-cyan-400 uppercase tracking-wider"

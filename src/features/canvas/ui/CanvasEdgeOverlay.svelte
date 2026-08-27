@@ -1,4 +1,17 @@
 <script lang="ts">
+  /**
+   * @file src/features/canvas/ui/CanvasEdgeOverlay.svelte
+   * @module features/canvas/ui/CanvasEdgeOverlay
+   *
+   * @architecture Interactive Connector Controls Overlay
+   * @description Renders interactive control handles on canvas edges for edge deletion and dynamic
+   * source/target connector re-routing.
+   *
+   * @remarks
+   * Midpoint coordinates for deletion action button are derived by evaluating the parametric Cubic Bezier equation at $t = 0.5$.
+   *
+   * @see {@link computeBezierMidpoint} Computes $t = 0.5$ parametric Bezier midpoint.
+   */
   import { X } from '@lucide/svelte';
   import type { CanvasEdge, CanvasNode } from '$shared/types/nodes';
   import { getNodeAnchor } from '../utils/geometry';
@@ -17,6 +30,10 @@
   let { edge, srcNode, tgtNode, isSelected, isReconnecting, onRemove, onStartReconnect }: Props =
     $props();
 
+  /**
+   * Calculates anchor boundary points for edge handles.
+   * ANCHOR: OVERLAY_ANCHORS
+   */
   let coords = $derived.by(() => {
     if (!srcNode || !tgtNode) return null;
     const srcCenter = { x: srcNode.position.x + 72.5, y: srcNode.position.y + 37 };
@@ -35,7 +52,9 @@
     };
   });
 
+  /** Bezier parameters calculation. */
   let bezierParams = $derived(coords ? getBezierParams(coords) : null);
+  /** Parametric curve midpoint ($t = 0.5$) for positioning delete button. ANCHOR: OVERLAY_MIDPOINT */
   let midpoint = $derived(bezierParams ? computeBezierMidpoint(bezierParams) : { x: 0, y: 0 });
 
   function handleDelete(e: PointerEvent) {
@@ -46,6 +65,10 @@
 </script>
 
 {#if coords && isSelected && !isReconnecting}
+  <!-- 
+    ANCHOR: RECONNECT_SOURCE_HANDLE
+    Draggable handle for re-linking source node connection.
+  -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     style="left: {coords.sx}px; top: {coords.sy}px;"
@@ -56,6 +79,10 @@
     <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
   </div>
 
+  <!-- 
+    ANCHOR: RECONNECT_TARGET_HANDLE
+    Draggable handle for re-linking target node connection.
+  -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     style="left: {coords.tx}px; top: {coords.ty}px;"
@@ -66,6 +93,10 @@
     <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
   </div>
 
+  <!-- 
+    ANCHOR: DELETE_CONNECTOR_BUTTON
+    Positioned at Bezier curve parametric midpoint.
+  -->
   <button
     onpointerdown={handleDelete}
     style="left: {midpoint.x}px; top: {midpoint.y}px;"

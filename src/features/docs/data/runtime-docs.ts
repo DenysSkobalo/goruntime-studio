@@ -1,5 +1,26 @@
+/**
+ * @file src/features/docs/data/runtime-docs.ts
+ * @module features/docs/data/runtime-docs
+ *
+ * @architecture Go Runtime Specification Data Store
+ * @description Exact structural definitions, 64-bit byte offsets, alignment specifications,
+ * key invariants, and official source links for core Go runtime structures (`runtime.hchan`, `runtime.g`, `runtime.sudog`).
+ *
+ * @remarks
+ * **64-bit Memory Layout Alignment Rules:**
+ * Structural byte offsets reflect Go 64-bit architecture alignment conventions (8-byte pointer size,
+ * word-aligned integer fields).
+ *
+ * @see {@link https://github.com/golang/go/blob/master/src/runtime/chan.go Go Channel Source Code}
+ * @see {@link https://github.com/golang/go/blob/master/src/runtime/runtime2.go Go Runtime Structures Specification}
+ */
+
 import type { RuntimeDoc } from './types';
 
+/**
+ * Static registry of core Go runtime primitive documentation specifications.
+ * ANCHOR: RUNTIME_DOCS_REGISTRY
+ */
 export const RUNTIME_DOCS: RuntimeDoc[] = [
   {
     id: 'channel',
@@ -29,7 +50,7 @@ export const RUNTIME_DOCS: RuntimeDoc[] = [
     ],
     source: {
       file: 'src/runtime/chan.go',
-      repoUrl: 'https://github.com/golang/go/blob/master/src/runtime/chan.go',
+      repoUrl: 'https://github.com/golang/go/blob/master/src/runtime/chan.go#L34',
     },
     memoryLayout: [
       {
@@ -161,7 +182,7 @@ export const RUNTIME_DOCS: RuntimeDoc[] = [
     ],
     source: {
       file: 'src/runtime/runtime2.go',
-      repoUrl: 'https://github.com/golang/go/blob/master/src/runtime/runtime2.go',
+      repoUrl: 'https://github.com/golang/go/blob/master/src/runtime/chan.go#L34',
     },
     memoryLayout: [
       {
@@ -271,7 +292,7 @@ export const RUNTIME_DOCS: RuntimeDoc[] = [
     ],
     source: {
       file: 'src/runtime/runtime2.go',
-      repoUrl: 'https://github.com/golang/go/blob/master/src/runtime/runtime2.go',
+      repoUrl: 'https://github.com/golang/go/blob/master/src/runtime/runtime2.go#L404',
     },
     memoryLayout: [
       {
@@ -348,7 +369,7 @@ export const RUNTIME_DOCS: RuntimeDoc[] = [
       },
       {
         offset: '0x38 (56)',
-        field: 'c',
+        field: '*hchan',
         type: '*hchan',
         note: {
           uk: 'Вказівник на канал, на якому заблокована G',

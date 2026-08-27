@@ -1,41 +1,92 @@
+# ==============================================================================
+# @file Makefile
+# @architecture Project Build & Automation Lifecycle Controller
+# @description Unified command interface for local development, CI/CD verification pipelines,
+# static code analysis, code formatting, and production artifact compilation.
+# ==============================================================================
+
+.DEFAULT_GOAL := help
+.SHELLFLAGS   := -eu -c
+SHELL         := /bin/bash
+
+# Configuration Variables
+NODE_MODULES  := node_modules
+BUILD_DIR     := dist
+CACHE_DIRS    := .svelte-kit .output .vite
+
+# Declare non-file targets to prevent name collisions with physical files
 .PHONY: dev build preview check lint test format format-check clean help
 
-node_modules: package.json package-lock.json
-	npm ci
+# ------------------------------------------------------------------------------
+# DEPENDENCY MANAGEMENT
+# ------------------------------------------------------------------------------
 
-dev: node_modules
+## Install dependencies deterministically using package-lock.json
+$(NODE_MODULES): package.json package-lock.json
+	@echo "--> Installing dependencies via npm ci..."
+	npm ci
+	@touch $(NODE_MODULES)
+
+# ------------------------------------------------------------------------------
+# DEVELOPMENT PIPELINE
+# ------------------------------------------------------------------------------
+
+## Start local Vite development server with Hot Module Replacement (HMR)
+dev: $(NODE_MODULES)
 	npm run dev
 
-build: node_modules
+## Build optimized production application bundle
+build: $(NODE_MODULES)
 	npm run build
 
+## Preview compiled production build locally
 preview: build
 	npm run preview
 
-check: node_modules
+# ------------------------------------------------------------------------------
+# QUALITY ASSURANCE & TESTING
+# ------------------------------------------------------------------------------
+
+## Execute static type checking across Svelte and TypeScript files (svelte-check / tsc)
+check: $(NODE_MODULES)
 	npm run check
 
-lint: node_modules
+## Run ESLint static code analysis
+lint: $(NODE_MODULES)
 	npm run lint
 
-test: node_modules
+## Execute Vitest unit test suite
+test: $(NODE_MODULES)
 	npm run test:unit
 
-format: node_modules
-	npm run format
-
-format-check: node_modules
+## Verify code formatting compliance with Prettier rules without mutating files
+format-check: $(NODE_MODULES)
 	npm run format:check
 
-clean:
-	rm -rf dist node_modules .svelte-kit .output
+## Format source code base using Prettier
+format: $(NODE_MODULES)
+	npm run format
 
+# ------------------------------------------------------------------------------
+# MAINTENANCE & HELP
+# ------------------------------------------------------------------------------
+
+## Purge build artifacts, dependencies, and compiler cache directories
+clean:
+	@echo "--> Purging build artifacts, node_modules, and internal caches..."
+	rm -rf $(BUILD_DIR) $(NODE_MODULES) $(CACHE_DIRS)
+
+## Display self-documented list of available make targets
 help:
-	@echo "Available commands:"
-	@echo "  make dev          - Start development server"
-	@echo "  make build        - Build production bundle"
-	@echo "  make check        - Run type-checking (svelte-check / tsc)"
-	@echo "  make lint         - Run ESLint"
-	@echo "  make test         - Run Vitest unit tests"
-	@echo "  make format       - Format code using Prettier"
-	@echo "  make clean        - Remove build artifacts and dependencies"
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Available Targets:"
+	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
+		helpMessage = match(lastLine, /^## (.*)/); \
+		if (helpMessage) { \
+			helpCommand = substr($$1, 1, index($$1, ":")-1); \
+			helpText = substr(lastLine, RSTART + 3, RLENGTH - 3); \
+			printf "  \033[36m%-15s\033[0m %s\n", helpCommand, helpText; \
+		} \
+	} \
+	{ lastLine = $$0 }' $(MAKEFILE_LIST)

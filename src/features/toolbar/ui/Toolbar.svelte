@@ -1,7 +1,28 @@
 <script lang="ts">
+  /**
+   * @file src/features/toolbar/ui/Toolbar.svelte
+   * @module features/toolbar/ui/Toolbar
+   *
+   * @architecture Interactive Tool Palette Sidebar Component
+   * @description Vertical toolbar sidebar component providing quick selection of active creation and interaction tools
+   * (Pointer/Move, Goroutine creation, Channel creation, and Connector linking).
+   *
+   * @remarks
+   * **Go Concurrency Primitive Tooling Mapping:**
+   * - `pointer` (Hotkey `V`): Object selection and viewport spatial repositioning.
+   * - `goroutine` (Hotkey `G`): Instantiates user-space threads (`runtime.g`).
+   * - `channel` (Hotkey `C`): Instantiates synchronization ring buffers (`runtime.hchan`).
+   * - `connect` (Hotkey `L`): Instantiates wait list queue connectors (`runtime.sudog`).
+   *
+   * @see {@link canvasStore} State store holding active tool selection state.
+   */
   import { MousePointer, Network, Database, Link2 } from '@lucide/svelte';
   import { canvasStore } from '$features/canvas/model/canvas.store.svelte';
 
+  /**
+   * Static palette tool descriptor array containing iconography, color accents, Go runtime mappings, and keyboard shortcuts.
+   * ANCHOR: PALETTE_TOOLS_CONFIG
+   */
   const paletteTools = [
     {
       tool: 'pointer' as const,
@@ -42,11 +63,13 @@
   ];
 </script>
 
+<!-- ANCHOR: TOOLBAR_SIDEBAR -->
 <aside
   class="w-14 shrink-0 border-r border-zinc-800 bg-[#09090b] flex flex-col items-center py-4 gap-3 select-none z-30"
 >
   {#each paletteTools as pt}
     {@const isActive = canvasStore.activeTool === pt.tool}
+    <!-- ANCHOR: TOOL_ITEM -->
     <div class="relative group flex items-center">
       <button
         onclick={() => canvasStore.setTool(isActive ? 'pointer' : pt.tool)}
@@ -56,6 +79,7 @@
       >
         <pt.icon class="h-5 w-5" />
       </button>
+      <!-- ANCHOR: TOOL_TOOLTIP -->
       <div
         class="absolute left-full ml-3 px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 pointer-events-none"
       >

@@ -1,13 +1,31 @@
 <script lang="ts">
+  /**
+   * @file src/features/inspector/ui/SchedulerTopology.svelte
+   * @module features/inspector/ui/SchedulerTopology
+   *
+   * @architecture GMP Scheduler Topology Visualizer Component
+   * @description Renders current state of the Go runtime GMP (Goroutine-Machine-Processor) scheduler topology,
+   * including the Global Run Queue (GRQ) and per-P Local Run Queues (LRQ).
+   *
+   * @remarks
+   * **GMP Scheduling Model:**
+   * Displays logical processors ($P$) managing M-to-N multiplexing of Goroutines ($G$) onto OS threads ($M$).
+   *
+   * @see {@link timeline} Source snapshot store for scheduler state telemetry.
+   */
   import { Network, Server } from '@lucide/svelte';
   import { timeline } from '../model/timeline.store.svelte';
 
+  /** Current timeline snapshot reference. ANCHOR: SNAPSHOT_DERIVED */
   let snapshot = $derived(timeline.currentSnapshot);
+  /** Global Run Queue (GRQ) element list array derived state. ANCHOR: GRQ_DERIVED */
   let grq = $derived(snapshot?.sched.grq ?? []);
+  /** Logical Processors (P) collection array derived state. ANCHOR: PROCESSORS_DERIVED */
   let processors = $derived(snapshot ? Object.values(snapshot.processors) : []);
 </script>
 
 <div class="space-y-4 font-mono text-xs">
+  <!-- ANCHOR: GLOBAL_RUN_QUEUE -->
   <div class="glow-card p-4 space-y-2 border border-zinc-800 bg-zinc-950">
     <div class="flex items-center justify-between">
       <span
@@ -22,6 +40,7 @@
     </div>
   </div>
 
+  <!-- ANCHOR: PROCESSOR_LRQ_LIST -->
   <div class="space-y-3">
     <div
       class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5"

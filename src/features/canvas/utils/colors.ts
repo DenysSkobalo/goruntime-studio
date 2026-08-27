@@ -1,3 +1,20 @@
+/**
+ * @file src/features/canvas/utils/colors.ts
+ * @module features/canvas/utils/colors
+ *
+ * @architecture Visual Palette Mapping Utility
+ * @description Maps canvas connectors, edge types, and toolbar primitive selection states to visual hex colors and Tailwind CSS classes.
+ */
+
+/**
+ * Returns hex color code for edge connectors based on edge kind and selection state.
+ *
+ * ANCHOR: EDGE_COLOR_MAPPER
+ *
+ * @param kind - Edge classification string ('data_flow', 'sync_lock', 'context_signal').
+ * @param isSelected - Selection highlight boolean flag.
+ * @returns Hex color string.
+ */
 export function getEdgeColor(kind: string, isSelected: boolean): string {
   if (isSelected) return '#f43f5e';
   switch (kind) {
@@ -12,6 +29,14 @@ export function getEdgeColor(kind: string, isSelected: boolean): string {
   }
 }
 
+/**
+ * Maps canvas creation tools to Tailwind CSS background banner color classes.
+ *
+ * ANCHOR: TOOL_BANNER_COLOR_MAPPER
+ *
+ * @param tool - Selected active creation tool key.
+ * @returns Tailwind CSS background utility string.
+ */
 export function getToolBannerColor(tool: string): string {
   switch (tool) {
     case 'goroutine':

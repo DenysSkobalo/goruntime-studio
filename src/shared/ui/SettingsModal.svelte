@@ -1,22 +1,36 @@
 <script lang="ts">
+  /**
+   * @file src/shared/ui/SettingsModal.svelte
+   * @module shared/ui/SettingsModal
+   *
+   * @architecture Application Settings & Preferences Modal Component
+   * @description Preferences dialog allowing users to switch UI visual themes (Light, Dark, System)
+   * and internationalization locale languages (English, Ukrainian).
+   *
+   * @see {@link settingsStore} Reactive theme management store.
+   * @see {@link i18n} Global localization store.
+   */
   import Modal from '$shared/ui/Modal.svelte';
   import { settingsStore } from '$shared/stores/settings.store.svelte';
   import { i18n } from '$core/i18n';
   import type { Lang } from '$core/i18n/types';
   import { Settings, Sun, Moon, Monitor, Check } from '@lucide/svelte';
 
+  /** Theme mode choices array configuration. ANCHOR: THEMES_CONFIG */
   const themes = [
     { id: 'light', labelKey: 'settingsModal.themeLight', icon: Sun },
     { id: 'dark', labelKey: 'settingsModal.themeDark', icon: Moon },
     { id: 'system', labelKey: 'settingsModal.themeSystem', icon: Monitor },
   ] as const;
 
+  /** Supported language options descriptor array. ANCHOR: LANGUAGES_CONFIG */
   const languages: { id: Lang; label: string }[] = [
     { id: 'en', label: 'English' },
     { id: 'uk', label: 'Українська' },
   ];
 </script>
 
+<!-- ANCHOR: SETTINGS_MODAL_DIALOG -->
 <Modal
   isOpen={settingsStore.isOpen}
   title={i18n.t('settingsModal.title')}
@@ -26,7 +40,7 @@
   onClose={() => settingsStore.setOpen(false)}
 >
   <div class="space-y-6 font-mono text-xs">
-    <!-- Theme Selection -->
+    <!-- ANCHOR: THEME_SELECTION_SECTION -->
     <div class="space-y-2.5">
       <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
         {i18n.t('settingsModal.themeSection')}
@@ -53,7 +67,7 @@
       </div>
     </div>
 
-    <!-- Language Selection -->
+    <!-- ANCHOR: LANGUAGE_SELECTION_SECTION -->
     <div class="space-y-2.5">
       <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
         {i18n.t('settingsModal.themeSection')}

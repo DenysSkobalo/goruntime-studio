@@ -1,16 +1,33 @@
 <script lang="ts">
+  /**
+   * @file src/shared/ui/ActionButton.svelte
+   * @module shared/ui/ActionButton
+   *
+   * @architecture Interactive Operation Trigger Button Component
+   * @description Styled action button supporting custom icon components and color themes used throughout inspector
+   * controls for triggering runtime operations (`go func()`, `schedule()`, `ch <- val`, `<-ch`, `close()`).
+   */
   import type { Component, Snippet } from 'svelte';
   import type { BadgeVariant } from './StatusBadge.svelte';
 
+  /**
+   * Action button props contract interface.
+   * ANCHOR: ACTION_BUTTON_PROPS
+   */
   interface Props {
+    /** Click event callback handler. */
     onclick: () => void;
+    /** Color variant matching {@link BadgeVariant}. */
     variant?: BadgeVariant;
+    /** Optional Lucide icon component. */
     icon?: Component<{ class?: string }>;
+    /** Svelte 5 snippet children text label. */
     children: Snippet;
   }
 
   let { onclick, variant = 'cyan', icon: Icon, children }: Props = $props();
 
+  /** Tailwind background and border styling lookup table per variant. ANCHOR: BUTTON_STYLES_MAP */
   const styles: Record<BadgeVariant, string> = {
     cyan: 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/30',
     emerald: 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30',
@@ -26,6 +43,7 @@
   };
 </script>
 
+<!-- ANCHOR: ACTION_BUTTON_ELEMENT -->
 <button
   {onclick}
   class="flex items-center justify-center gap-1.5 px-3 py-1.5 border rounded-lg font-bold font-mono text-xs transition {styles[

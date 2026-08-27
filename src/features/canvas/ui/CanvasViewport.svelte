@@ -1,4 +1,19 @@
 <script lang="ts">
+  /**
+   * @file src/features/canvas/ui/CanvasViewport.svelte
+   * @module features/canvas/ui/CanvasViewport
+   *
+   * @architecture Interactive 2D Workspace Viewport Engine
+   * @description Coordinates canvas interactions, node dragging, connector creation/re-routing,
+   * global keyboard shortcut handling, and real-time Bezier path synthesis.
+   *
+   * @remarks
+   * **Frame-Lock Throttling Strategy:**
+   * Utilizes `requestAnimationFrame` with an `isTicking` flag during pointer movement to cap state updates to display refresh rates,
+   * avoiding DOM paint queue starvation and lag during continuous mouse dragging.
+   *
+   * @see {@link canvasStore} State store holding active nodes, edges, and active tools.
+   */
   import type { CanvasNode, CanvasNodeType } from '$shared/types/nodes';
   import CanvasNodeComponent from './CanvasNode.svelte';
   import { canvasStore, validateConnection } from '../model/canvas.store.svelte';
@@ -11,28 +26,38 @@
 
   let viewportRef = $state<HTMLDivElement | null>(null);
 
-  // Стан драгування ноди
+  // Node dragging internal state
   let isDraggingNode = $state(false);
   let draggedNodeId = $state<string | null>(null);
   let dragOffset = { x: 0, y: 0 };
 
-  // Зв'язування та перевизначення
+  // Connection and re-routing state
   let connectingSourceId = $state<string | null>(null);
   let reconnectingEdgeId = $state<string | null>(null);
   let reconnectingEnd = $state<'source' | 'target' | null>(null);
   let hoveredNodeId = $state<string | null>(null);
   let mousePos = $state({ x: 0, y: 0 });
 
-  // Frame-Lock прапорець для запобігання переповненню черги кадрів
+  /**
+   * Frame-Lock flag preventing high-frequency `pointermove` event flooding.
+   * ANCHOR: FRAME_LOCK_STATE
+   */
   let isTicking = false;
   let latestPointerCoords = { x: 0, y: 0 };
 
+  /**
+   * Converts client window screen space coordinates to canvas viewport relative space.
+   */
   function getCanvasCoordinates(clientX: number, clientY: number) {
     if (!viewportRef) return { x: clientX, y: clientY };
     const rect = viewportRef.getBoundingClientRect();
     return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
+  /**
+   * Handles canvas background click events for node instantiation or selection clear.
+   * ANCHOR: CANVAS_POINTER_DOWN
+   */
   function handleCanvasPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
     const coords = getCanvasCoordinates(e.clientX, e.clientY);
@@ -54,6 +79,10 @@
     reconnectingEnd = null;
   }
 
+  /**
+   * Initiates node dragging or connection linking on node pointer press.
+   * ANCHOR: NODE_POINTER_DOWN
+   */
   function handleNodePointerDown(e: PointerEvent, node: CanvasNode) {
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -99,6 +128,10 @@
     window.addEventListener('pointerup', handleWindowPointerUp);
   }
 
+  /**
+   * Throttled window pointer move event listener updating drag position and active hover targets.
+   * ANCHOR: WINDOW_POINTER_MOVE
+   */
   function handleWindowPointerMove(e: PointerEvent) {
     latestPointerCoords = getCanvasCoordinates(e.clientX, e.clientY);
 
@@ -124,6 +157,9 @@
     }
   }
 
+  /**
+   * Finalizes node dragging or connection re-routing on pointer release.
+   */
   function handleWindowPointerUp(e: PointerEvent) {
     if (reconnectingEdgeId && reconnectingEnd) {
       const elem = document.elementFromPoint(e.clientX, e.clientY);
@@ -160,6 +196,16 @@
     }
   }
 
+  /**
+   * Global hotkey keyboard event handler.
+   *
+   * ANCHOR: HOTKEY_DISPATCHER
+   *
+   * @remarks
+   * **Why text input bypass check is required:**
+   * Prevents workspace hotkey actions (Delete, V, G, C, L, P) from triggering while users are typing inside input fields,
+   * textareas, or content-editable elements in inspector panels.
+   */
   function handleKeyDown(e: KeyboardEvent) {
     const target = e.target as HTMLElement;
     if (
@@ -172,7 +218,7 @@
       return;
     }
 
-    // Запобігаємо перехопленню системних гарячих клавіш (Cmd+C, Ctrl+C, Cmd+V тощо)
+    // Ignore keypresses during system shortcuts (Cmd+C, Ctrl+V, etc.)
     if (e.ctrlKey || e.metaKey || e.altKey) {
       return;
     }

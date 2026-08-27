@@ -1,12 +1,25 @@
 @import 'tailwindcss';
 
+/**
+ * @file src/app.css
+ * @architecture Global Design Tokens & Tailwind CSS v4 Configuration
+ * @description Theme variables, dark mode variants, custom scrollbar styling, card glow effects,
+ * and keyframe animation pipelines for 2D spatial canvas data flows.
+ *
+ * @remarks
+ * **Theme Custom Variant:**
+ * Maps dark theme styling to `.dark` class wrapper selector for explicit dark mode toggling.
+ */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ANCHOR: THEME_VARIABLES */
 @theme {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* ANCHOR: BASE_LAYER_STYLES */
 @layer base {
   :root {
     --bg-grid-color: rgba(24, 24, 27, 0.05);
@@ -76,6 +89,7 @@
   }
 }
 
+/* ANCHOR: GLOW_CARD_COMPONENTS */
 .glow-card {
   position: relative;
   overflow: hidden;
@@ -105,7 +119,7 @@
   background-color: #09090b;
 }
 
-/* ── Animations ── */
+/* ANCHOR: ANIMATION_KEYFRAMES */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -150,7 +164,7 @@
   animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* ── Data flow animation for Canvas ── */
+/* ANCHOR: DATA_FLOW_CANVAS_ANIMATION */
 @keyframes data-flow {
   0% {
     stroke-dashoffset: 24;

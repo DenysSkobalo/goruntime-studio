@@ -1,5 +1,21 @@
+/**
+ * @file src/features/canvas/model/canvas.initial.ts
+ * @module features/canvas/model/canvas.initial
+ *
+ * @architecture Default Initial Workspace Seed Data
+ * @description Bootstrap layout definitions containing initial nodes (`goroutine-1`, `channel-1`)
+ * and default connectors (`edge-initial-1`) for fresh simulation sessions.
+ *
+ * @see {@link DEFAULT_CANVAS_NODES}
+ * @see {@link DEFAULT_CANVAS_EDGES}
+ */
+
 import type { CanvasEdge, CanvasNode } from '$shared/types/nodes';
 
+/**
+ * Initial node dataset seeded when bootstrapping the interactive canvas.
+ * ANCHOR: DEFAULT_CANVAS_NODES
+ */
 export const DEFAULT_CANVAS_NODES: CanvasNode[] = [
   {
     id: 'goroutine-1',
@@ -21,6 +37,10 @@ export const DEFAULT_CANVAS_NODES: CanvasNode[] = [
   },
 ];
 
+/**
+ * Initial edge connection dataset linking default bootstrap nodes.
+ * ANCHOR: DEFAULT_CANVAS_EDGES
+ */
 export const DEFAULT_CANVAS_EDGES: CanvasEdge[] = [
   {
     id: 'edge-initial-1',

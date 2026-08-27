@@ -1,4 +1,19 @@
 <script lang="ts">
+  /**
+   * @file src/features/inspector/ui/NodeInternals.svelte
+   * @module features/inspector/ui/NodeInternals
+   *
+   * @architecture Primitive Node Memory & State Inspector Component
+   * @description Inspector details view rendering memory layouts, struct field values, execution states,
+   * element sizes, and configuration controls for Goroutine (`runtime.g`) and Channel (`runtime.hchan`) primitives.
+   *
+   * @remarks
+   * **Memory Alignment & Size Mapping:**
+   * Displayed byte offsets match Go 64-bit memory layout rules (e.g. `qcount` at `0x00`, `dataqsiz` at `0x08`, `buf` at `0x10`).
+   *
+   * @see {@link ELEM_SIZE_MAP} Memory size map per element type.
+   * @see {@link getGoroutineStack} Stack pointer calculation utility.
+   */
   import type {
     CanvasNode,
     ChannelElemType,
@@ -22,11 +37,12 @@
     Code2,
     ChevronRight,
   } from '@lucide/svelte';
-  import { handleDocLinkClick } from '$shared/lib/navigation';
+  import { navigateToSpec } from '$shared/lib/navigation';
 
   let { node, baseAddress }: { node: CanvasNode; baseAddress: bigint } = $props();
   let hexAddress = $derived(formatHex(baseAddress));
 
+  /** Channel element type options contract array. */
   const CHANNEL_ELEM_OPTIONS: { value: ChannelElemType; label: string }[] = [
     { value: 'string', label: 'chan string' },
     { value: 'int64', label: 'chan int64' },
@@ -34,6 +50,10 @@
     { value: 'struct{}', label: 'chan struct{}' },
   ];
 
+  /**
+   * Updates node label string in canvas store.
+   * ANCHOR: LABEL_INPUT_HANDLER
+   */
   function handleLabelInput(e: Event) {
     const val = (e.target as HTMLInputElement).value;
     if (val.trim()) {
@@ -41,27 +61,32 @@
     }
   }
 
+  /**
+   * Updates selected channel element type.
+   * ANCHOR: CHANNEL_TYPE_SELECT
+   */
   function handleTypeSelect(e: Event) {
     const val = (e.target as HTMLSelectElement).value as ChannelElemType;
     canvasStore.setChannelElemType(node.id, val);
   }
 
+  /**
+   * Increments or decrements channel buffer capacity (`dataqsiz`).
+   */
   function updateCapacity(delta: number) {
     if (node.type === 'channel') {
       canvasStore.setChannelCapacity(node.id, node.capacity + delta);
     }
   }
 
-  function onSpecClick(e: MouseEvent, primitiveId: string) {
-    handleDocLinkClick(e, `#docs#${primitiveId}`);
-  }
-
+  /** Derived stack memory allocation snapshot for Goroutine nodes. ANCHOR: GOROUTINE_STACK_DERIVED */
   let stack = $derived(
     node.type === 'goroutine' ? getGoroutineStack((node as GoroutineNode).goid) : null,
   );
 </script>
 
 <div class="space-y-4 font-mono text-xs">
+  <!-- ANCHOR: TARGET_IDENTITY_CARD -->
   <div class="glow-card p-3.5 space-y-2 border border-zinc-800 bg-zinc-900/60 rounded-xl">
     <div class="flex items-center justify-between text-zinc-400">
       <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
@@ -97,6 +122,7 @@
 
   {#if node.type === 'goroutine'}
     {@const g = node as GoroutineNode}
+    <!-- ANCHOR: GOROUTINE_DESCRIPTOR_CARD -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-900/60 rounded-xl">
       <NodeHeader nodeType="goroutine" title={i18n.t('inspector.descriptorG')} />
       <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1.5 text-[11px]">
@@ -128,6 +154,7 @@
       </div>
     </div>
 
+    <!-- ANCHOR: GOROUTINE_STATE_CARD -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-900/60 rounded-xl">
       <div class="flex items-center gap-2 font-bold text-emerald-400 text-xs">
         <Cpu class="w-4 h-4" />
@@ -150,6 +177,7 @@
       </div>
     </div>
 
+    <!-- ANCHOR: GOROUTINE_SPEC_LINKS -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-950/80 rounded-xl">
       <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
         {i18n.t('inspector.docAndSpec')}
@@ -172,7 +200,7 @@
           href="#docs#goroutine"
           target="_blank"
           rel="noopener noreferrer"
-          onclick={(e) => onSpecClick(e, 'goroutine')}
+          onclick={(e) => navigateToSpec(e, 'goroutine')}
           class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-950/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-300 text-xs font-semibold transition cursor-pointer group"
         >
           <span class="flex items-center gap-2">
@@ -189,6 +217,7 @@
     {@const ch = node as ChannelNode}
     {@const elemSize = ELEM_SIZE_MAP[ch.elemType]}
 
+    <!-- ANCHOR: CHANNEL_DESCRIPTOR_CARD -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-900/60 rounded-xl">
       <NodeHeader nodeType="channel" title={i18n.t('inspector.descriptorHchan')} />
       <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-2 text-[11px]">
@@ -216,6 +245,7 @@
       </div>
     </div>
 
+    <!-- ANCHOR: CHANNEL_STATE_CARD -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-900/60 rounded-xl">
       <div class="flex items-center gap-2 font-bold text-cyan-400 text-xs">
         <Database class="w-4 h-4" />
@@ -251,6 +281,7 @@
       </div>
     </div>
 
+    <!-- ANCHOR: CHANNEL_SPEC_LINKS -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-950/80 rounded-xl">
       <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
         {i18n.t('inspector.docAndSpec')}
@@ -273,7 +304,7 @@
           href="#docs#channel"
           target="_blank"
           rel="noopener noreferrer"
-          onclick={(e) => onSpecClick(e, 'channel')}
+          onclick={(e) => navigateToSpec(e, 'channel')}
           class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-900/50 border border-cyan-800/40 text-cyan-300 text-xs font-semibold transition cursor-pointer group"
         >
           <span class="flex items-center gap-2">

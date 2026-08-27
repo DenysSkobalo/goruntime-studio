@@ -1,3 +1,19 @@
+/**
+ * @file src/features/canvas/model/canvas.store.svelte.ts
+ * @module features/canvas/model/canvas.store
+ *
+ * @architecture Reactive Canvas Workspace State Store (Svelte 5 Runes)
+ * @description Centralized state engine managing interactive canvas nodes, edges, validation rules,
+ * tool selections, element positions, and fast runtime lookup indices.
+ *
+ * @remarks
+ * **Go Concurrency Structural Validation Rules:**
+ * Direct Goroutine-to-Goroutine (`g -> g`) or Channel-to-Channel (`hchan -> hchan`) connections are prohibited.
+ * In Go runtime semantics, Goroutines communicate strictly via synchronization channels or sync primitives (`hchan`, `sync.Mutex`).
+ *
+ * @see {@link validateConnection} Evaluates connection validity according to Go runtime primitives topology.
+ */
+
 import type {
   CanvasEdge,
   CanvasNode,
@@ -9,13 +25,27 @@ import type {
 import { formatHex, getRawBaseAddress } from '$core/memory/layout';
 import { DEFAULT_CANVAS_NODES, DEFAULT_CANVAS_EDGES } from './canvas.initial';
 
+/** Active interactive canvas tool options. */
 export type CanvasTool = 'pointer' | 'connect' | CanvasNodeType;
 
+/** Connection validation result contract. */
 export interface ConnectionCheck {
   valid: boolean;
   reason?: string;
 }
 
+/**
+ * Validates whether a proposed edge connection between two nodes satisfies Go runtime structural constraints.
+ *
+ * ANCHOR: VALIDATE_CONNECTION
+ *
+ * @param nodes - Current active node array.
+ * @param edges - Current active edge array.
+ * @param sourceId - Source node identifier.
+ * @param targetId - Target node identifier.
+ * @param ignoreEdgeId - Optional edge ID to ignore during duplicate connection checks (used when re-routing).
+ * @returns {@link ConnectionCheck} detailing validity boolean state and failure explanation.
+ */
 export function validateConnection(
   nodes: CanvasNode[],
   edges: CanvasEdge[],
@@ -63,20 +93,29 @@ export function validateConnection(
 }
 
 /**
- * @todo Issue #CANVAS-102: Extend CanvasStore to map additional runtime primitives.
- * Update state handlers and mappers to synchronize:
- * - Mutex lock states and wait queues
- * - Semaphore trees (semaRoot)
- * - Channel multiplexing cases (selectgo)
+ * Reactive state store managing the interactive graph workspace using Svelte 5 signal runes.
+ * ANCHOR: CANVAS_STORE_CLASS
  */
 class CanvasStore {
+  /** Array of active vector edges connecting canvas nodes. */
   edges = $state<CanvasEdge[]>([]);
+  /** Array of active nodes (Goroutines, Channels) placed on the canvas layout. */
   nodes = $state<CanvasNode[]>([]);
+  /** Currently selected node identifier. */
   selectedNodeId = $state<string | null>(null);
+  /** Currently selected edge identifier. */
   selectedEdgeId = $state<string | null>(null);
+  /** Selected active creation or interaction tool. */
   activeTool = $state<CanvasTool>('pointer');
+  /** Simulation playback flag. */
   isSimulating = $state(false);
 
+  /**
+   * Derived fast lookup Map indexing active Goroutines by their unique `goid`.
+   * ANCHOR: GOROUTINES_BY_GOID_LOOKUP
+   *
+   * @complexity $\mathcal{O}(N)$ construction, $\mathcal{O}(1)$ lookup.
+   */
   goroutinesByGoid = $derived.by(() => {
     const map = new Map<number, GoroutineNode>();
     for (const node of this.nodes) {
@@ -87,6 +126,12 @@ class CanvasStore {
     return map;
   });
 
+  /**
+   * Derived fast lookup Map indexing channels by both label (`ch1`) and simulated hex base address (`0xc000...`).
+   * ANCHOR: CHANNELS_LOOKUP
+   *
+   * @complexity $\mathcal{O}(N)$ construction, $\mathcal{O}(1)$ lookup.
+   */
   channelsByLabelOrAddress = $derived.by(() => {
     const map = new Map<string, ChannelNode>();
     for (const node of this.nodes) {
@@ -102,16 +147,30 @@ class CanvasStore {
     this.initMainWorkspace();
   }
 
+  /**
+   * Updates active workspace tool setting ('pointer', 'connect', 'goroutine', 'channel').
+   */
   setTool(tool: CanvasTool) {
     this.activeTool = tool;
   }
 
+  /**
+   * Re-initializes workspace with default bootstrap initial nodes and edges.
+   */
   initMainWorkspace() {
     this.nodes = structuredClone(DEFAULT_CANVAS_NODES);
     this.edges = structuredClone(DEFAULT_CANVAS_EDGES);
     this.selectNode('goroutine-1');
   }
 
+  /**
+   * Instantiates a new canvas node of specified type at given canvas position.
+   *
+   * @param type - Node primitive type ('goroutine' | 'channel').
+   * @param position - Workspace X/Y coordinates.
+   * @param label - Optional custom node label string.
+   * @returns Newly created {@link CanvasNode}.
+   */
   addNode(type: CanvasNodeType, position: { x: number; y: number }, label?: string): CanvasNode {
     const currentIndex = this.nodes.filter((n) => n.type === type).length + 1;
     const id = `${type}-${currentIndex}`;
@@ -246,4 +305,5 @@ class CanvasStore {
   }
 }
 
+/** Singleton canvas state store instance. */
 export const canvasStore = new CanvasStore();

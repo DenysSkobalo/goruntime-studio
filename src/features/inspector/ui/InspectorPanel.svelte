@@ -1,4 +1,19 @@
 <script lang="ts">
+  /**
+   * @file src/features/inspector/ui/InspectorPanel.svelte
+   * @module features/inspector/ui/InspectorPanel
+   *
+   * @architecture Primary Inspector Sidebar Container Component
+   * @description Slide-over inspection drawer displaying node details, wait queue connectors,
+   * tabbed sub-views (Details vs Scheduler Topology), and selection management.
+   *
+   * @remarks
+   * **Selection Derived State:**
+   * Dynamically evaluates whether selected canvas entity is a Node (`GoroutineNode`/`ChannelNode`) or Edge (`sudog` connector),
+   * calculating base memory addresses and binding inspector data models.
+   *
+   * @see {@link canvasStore} State store holding selected node/edge IDs.
+   */
   import { getGoroutineStack, getRawBaseAddress } from '$core/memory/layout';
   import { canvasStore } from '$features/canvas/model/canvas.store.svelte';
   import { i18n } from '$core/i18n';
@@ -7,11 +22,19 @@
   import NodeInternals from './NodeInternals.svelte';
   import SchedulerTopology from './SchedulerTopology.svelte';
 
+  /** Active sub-tab state ('details' | 'scheduler'). ANCHOR: ACTIVE_TAB_STATE */
   let activeTab = $state<'details' | 'scheduler'>('details');
+  /** Currently selected node derived reference. ANCHOR: SELECTED_NODE_DERIVED */
   let selectedNode = $derived(canvasStore.getNode(canvasStore.selectedNodeId));
+  /** Currently selected edge derived reference. ANCHOR: SELECTED_EDGE_DERIVED */
   let selectedEdge = $derived(canvasStore.getEdge(canvasStore.selectedEdgeId));
+  /** Drawer open status boolean. ANCHOR: IS_OPEN_DERIVED */
   let isOpen = $derived(selectedNode !== null || selectedEdge !== null);
 
+  /**
+   * Derived connector metadata evaluating sudog pointers, stack addresses, and source/target nodes.
+   * ANCHOR: EDGE_DATA_DERIVED
+   */
   let edgeData = $derived.by(() => {
     if (!selectedEdge) return null;
     const src = canvasStore.getNode(selectedEdge.source);
@@ -33,14 +56,19 @@
     };
   });
 
+  /** Base memory address derived bigint for selected node. ANCHOR: NODE_BASE_ADDRESS_DERIVED */
   let nodeBaseAddress = $derived(selectedNode ? getRawBaseAddress(selectedNode.id) : 0n);
 
+  /**
+   * Clears active node and edge selections, closing inspector panel.
+   */
   function handleClose() {
     canvasStore.selectNode(null);
     canvasStore.selectEdge(null);
   }
 </script>
 
+<!-- ANCHOR: INSPECTOR_PANEL_DRAWER -->
 <aside
   class="fixed right-0 top-14 bottom-0 w-96 bg-[#09090b] border-l border-zinc-800 text-zinc-200 z-40 transition-transform duration-300 shadow-2xl {isOpen
     ? 'translate-x-0'
@@ -48,6 +76,7 @@
 >
   {#if isOpen}
     <div class="flex flex-col h-full p-4 overflow-y-auto space-y-4 font-mono">
+      <!-- ANCHOR: PANEL_HEADER -->
       <header class="flex items-start justify-between border-b border-zinc-800 pb-3 gap-2">
         <div class="flex items-start gap-2.5 min-w-0 flex-1">
           <div
@@ -98,6 +127,7 @@
         </button>
       </header>
 
+      <!-- ANCHOR: TAB_CONTROLS -->
       <div
         class="grid grid-cols-2 gap-1.5 p-1 bg-zinc-900 rounded-lg border border-zinc-800 text-xs"
       >
@@ -120,6 +150,7 @@
         </button>
       </div>
 
+      <!-- ANCHOR: TAB_CONTENT -->
       {#if activeTab === 'details'}
         {#if edgeData}
           <ConnectorInternals {...edgeData} />

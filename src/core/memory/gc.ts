@@ -1,18 +1,57 @@
+/**
+ * @file src/core/memory/gc.ts
+ * @module core/memory/gc
+ *
+ * @architecture Concurrent Tri-Color Mark-Sweep Garbage Collector Engine
+ * @description Simulates the Go runtime Garbage Collector using Dijkstra/Yuasa hybrid write barriers,
+ * root scanning, mark phase transitions, pointer traversal, and sweep reclamation.
+ *
+ * @remarks
+ * **Tricolor Marking Abstraction:**
+ * - **White**: Unvisited heap objects; candidates for collection during sweep.
+ * - **Grey**: Reachable objects whose reachable child pointers are not yet scanned.
+ * - **Black**: Confirmed live objects whose outgoing references have been fully scanned.
+ *
+ * **Write Barrier Invariant (Strong/Weak Tricolor Protection):**
+ * During concurrent marking (`_GCmark`), mutating a heap pointer must invoke `writeBarrier`.
+ * If a write operation attempts to install a reference to a White object, the Write Barrier shades
+ * the target object to Grey to prevent premature reclamation by the collector.
+ *
+ * @see {@link https://github.com/golang/go/blob/master/src/runtime/mgc.go Go GC Subsystem Implementation}
+ * @see Dijkstra, E. W., et al. (1978). *On-the-fly garbage collection: An exercise in cooperation*. CACM.
+ * @see Yuasa, T. (1990). *Real-time garbage collection on general-purpose machines*. Journal of Systems and Software.
+ */
+
+/**
+ * Execution phases of the concurrent garbage collector.
+ * ANCHOR: GC_PHASES
+ */
 export type GCPhase = '_GCoff' | '_GCmark' | '_GCmarktermination';
 
+/**
+ * Tri-color marking visual color state model.
+ * ANCHOR: COLOR_MARK
+ */
 export type ColorMark = 'white' | 'grey' | 'black';
 
+/**
+ * Structure representing an allocated heap object inside the GC tracking table.
+ */
 export interface HeapObject {
+  /** Hexadecimal virtual address identifier. */
   address: string;
+  /** Size of payload block in bytes. */
   size: number;
+  /** Current tri-color collection mark state. */
   color: ColorMark;
+  /** Addresses of outgoing child heap pointers referenced by this object. */
   pointers: string[];
 }
 
 /**
- * @todo Issue #MEMORY-302: Connect memory primitives to visual timeline stream.
- * Connect GoHeapAllocator (mcache -> mcentral -> mheap) and GarbageCollector (Tri-color marking)
- * to timeline.store.svelte.ts for real-time heap frame animation and mark-sweep visualization.
+ * Simulates concurrent tri-color mark-sweep garbage collection runtime logic.
+ *
+ * INVARIANT: Write barrier is strictly active whenever phase === '_GCmark'.
  */
 export class GarbageCollector {
   private phase: GCPhase = '_GCoff';
@@ -23,6 +62,10 @@ export class GarbageCollector {
     this.initMockHeap();
   }
 
+  /**
+   * Initializes baseline mock heap objects for testing collection cycles.
+   * @internal
+   */
   private initMockHeap(): void {
     this.heap.set('0xc000100000', {
       address: '0xc000100000',
@@ -44,16 +87,31 @@ export class GarbageCollector {
     });
   }
 
+  /**
+   * Retrieves current active GC phase.
+   * @returns Current phase (`_GCoff`, `_GCmark`, `_GCmarktermination`).
+   */
   public getPhase(): GCPhase {
     return this.phase;
   }
 
+  /**
+   * Returns write barrier active state.
+   * @returns True if write barrier guard is enabled.
+   */
   public isWriteBarrierActive(): boolean {
     return this.writeBarrierEnabled;
   }
 
   /**
-   * Concurrent Mark Phase transition with Write Barrier enablement (Dijkstra/Yuasa hybrid barrier).
+   * Initiates concurrent marking phase, enabling Write Barrier and marking roots.
+   *
+   * ANCHOR: TRICOLOR_MARK_START
+   *
+   * @param roots - List of virtual addresses corresponding to root pointers (stacks, globals).
+   * @returns Phase status, list of newly shaded grey addresses, and log message.
+   *
+   * @see {@link https://github.com/golang/go/blob/master/src/runtime/mgc.go#L1200 gcStart}
    */
   public startMarkingPhase(roots: string[]): {
     phase: GCPhase;
@@ -83,7 +141,12 @@ export class GarbageCollector {
   }
 
   /**
-   * Tri-color marking step (Shade object & scan pointers).
+   * Performs a tri-color marking step (`gcDrain` step): shades object to Black and child references to Grey.
+   *
+   * ANCHOR: MARK_OBJECT_STEP
+   *
+   * @param address - Virtual address of target Grey object to process.
+   * @returns Transition details listing black-shaded object and newly greyed children.
    */
   public markObject(address: string): {
     shadedBlack: string;
@@ -114,7 +177,20 @@ export class GarbageCollector {
   }
 
   /**
-   * Write Barrier hook for pointer manipulation during concurrent mark.
+   * Intercepts pointer writes during concurrent mark phase to enforce tricolor invariants.
+   *
+   * ANCHOR: WRITE_BARRIER_HOOK
+   *
+   * @remarks
+   * **Dijkstra Insertion Barrier Hook:**
+   * Ensures any white target object assigned to a pointer slot during concurrent marking is instantly shaded to grey.
+   * Prevents mutator threads from hiding white objects behind black objects without GC awareness.
+   *
+   * @param _slotAddr - Address of memory field holding pointer reference.
+   * @param newPtrAddr - Address of newly assigned pointer target.
+   * @returns Result indicating shaded target object address if shading occurred.
+   *
+   * @see {@link https://github.com/golang/go/blob/master/src/runtime/mwbbuf.go Go Write Barrier Buffer}
    */
   public writeBarrier(
     _slotAddr: string,
@@ -137,7 +213,13 @@ export class GarbageCollector {
   }
 
   /**
-   * Sweep Phase & GC termination.
+   * Executes GC sweep phase: reclaims all remaining White objects and resets Black objects to White.
+   *
+   * ANCHOR: GC_SWEEP
+   *
+   * @returns Object listing addresses of reclaimed unreachable memory blocks.
+   *
+   * @see {@link https://github.com/golang/go/blob/master/src/runtime/mgcswp.go Go GC Sweep}
    */
   public sweep(): { reclaimedAddresses: string[]; explanation: string } {
     this.phase = '_GCmarktermination';
@@ -162,6 +244,10 @@ export class GarbageCollector {
     };
   }
 
+  /**
+   * Retrieves array of all current heap objects for inspection.
+   * @returns Array of {@link HeapObject} descriptors.
+   */
   public getHeapSnapshot(): HeapObject[] {
     return Array.from(this.heap.values());
   }
