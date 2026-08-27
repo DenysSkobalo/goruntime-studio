@@ -12,7 +12,17 @@
   import StatusBadge from '$shared/ui/StatusBadge.svelte';
   import { canvasStore } from '$features/canvas/model/canvas.store.svelte';
   import { i18n } from '$core/i18n';
-  import { ExternalLink, BookOpen, Database, Cpu, Plus, Minus, Code2, ChevronRight } from '@lucide/svelte';
+  import {
+    ExternalLink,
+    BookOpen,
+    Database,
+    Cpu,
+    Plus,
+    Minus,
+    Code2,
+    ChevronRight,
+  } from '@lucide/svelte';
+  import { handleDocLinkClick } from '$shared/lib/navigation';
 
   let { node, baseAddress }: { node: CanvasNode; baseAddress: bigint } = $props();
   let hexAddress = $derived(formatHex(baseAddress));
@@ -42,8 +52,8 @@
     }
   }
 
-  function openPlatformDocs(id: string) {
-    window.location.hash = `#docs#${id}`;
+  function onSpecClick(e: MouseEvent, primitiveId: string) {
+    handleDocLinkClick(e, `#docs#${primitiveId}`);
   }
 
   let stack = $derived(
@@ -77,7 +87,11 @@
           class="w-28 bg-zinc-900 border border-zinc-700 rounded px-2 py-0.5 text-zinc-100 font-bold text-right focus:border-emerald-500 outline-none text-xs"
         />
       </div>
-      <InfoRow label={i18n.t('inspector.heapAddress')} value={hexAddress} valueClass="text-amber-400 font-bold" />
+      <InfoRow
+        label={i18n.t('inspector.heapAddress')}
+        value={hexAddress}
+        valueClass="text-amber-400 font-bold"
+      />
     </div>
   </div>
 
@@ -136,7 +150,6 @@
       </div>
     </div>
 
-    <!-- Вертикальний повноширинний блок дій відповідно до UI/UX стандартів -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-950/80 rounded-xl">
       <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
         {i18n.t('inspector.docAndSpec')}
@@ -155,16 +168,21 @@
           <ExternalLink class="w-3.5 h-3.5 shrink-0 text-zinc-500" />
         </a>
 
-        <button
-          onclick={() => openPlatformDocs('goroutine')}
+        <a
+          href="#docs#goroutine"
+          target="_blank"
+          rel="noopener noreferrer"
+          onclick={(e) => onSpecClick(e, 'goroutine')}
           class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-950/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-300 text-xs font-semibold transition cursor-pointer group"
         >
           <span class="flex items-center gap-2">
             <BookOpen class="w-4 h-4 shrink-0 text-emerald-400" />
             <span>{i18n.t('docs.platformSpec')}</span>
           </span>
-          <ChevronRight class="w-4 h-4 shrink-0 text-emerald-500/60 group-hover:translate-x-0.5 transition-transform" />
-        </button>
+          <ChevronRight
+            class="w-4 h-4 shrink-0 text-emerald-500/60 group-hover:translate-x-0.5 transition-transform"
+          />
+        </a>
       </div>
     </div>
   {:else if node.type === 'channel'}
@@ -233,7 +251,6 @@
       </div>
     </div>
 
-    <!-- Вертикальний повноширинний блок дій відповідно до UI/UX стандартів -->
     <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-950/80 rounded-xl">
       <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
         {i18n.t('inspector.docAndSpec')}
@@ -252,16 +269,21 @@
           <ExternalLink class="w-3.5 h-3.5 shrink-0 text-zinc-500" />
         </a>
 
-        <button
-          onclick={() => openPlatformDocs('channel')}
+        <a
+          href="#docs#channel"
+          target="_blank"
+          rel="noopener noreferrer"
+          onclick={(e) => onSpecClick(e, 'channel')}
           class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-900/50 border border-cyan-800/40 text-cyan-300 text-xs font-semibold transition cursor-pointer group"
         >
           <span class="flex items-center gap-2">
             <BookOpen class="w-4 h-4 shrink-0 text-cyan-400" />
             <span>{i18n.t('docs.platformSpec')}</span>
           </span>
-          <ChevronRight class="w-4 h-4 shrink-0 text-cyan-500/60 group-hover:translate-x-0.5 transition-transform" />
-        </button>
+          <ChevronRight
+            class="w-4 h-4 shrink-0 text-cyan-500/60 group-hover:translate-x-0.5 transition-transform"
+          />
+        </a>
       </div>
     </div>
   {/if}

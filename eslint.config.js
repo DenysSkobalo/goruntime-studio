@@ -7,7 +7,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...eslintPluginSvelte.configs['flat/recommended'],
   {
-    ignores: ['dist/', 'node_modules/', '.svelte-kit/', '.output/']
+    ignores: ['dist/', 'node_modules/', '.svelte-kit/', '.output/'],
   },
   {
     files: ['**/*.ts', '**/*.svelte.ts'],
@@ -15,26 +15,29 @@ export default tseslint.config(
       parser: tseslint.parser,
       parserOptions: {
         ecmaVersion: 'latest',
-        sourceType: 'module'
-      }
-    }
+        sourceType: 'module',
+      },
+    },
   },
   {
     files: ['**/*.svelte'],
     languageOptions: {
       parserOptions: {
-        parser: tseslint.parser
-      }
-    }
+        parser: tseslint.parser,
+      },
+    },
   },
   {
     files: ['**/*.ts', '**/*.svelte.ts', '**/*.svelte'],
     rules: {
       'no-undef': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       'svelte/require-each-key': 'off',
       'svelte/no-unused-svelte-ignore': 'off',
-      'svelte/prefer-svelte-reactivity': 'off'
-    }
-  }
+      'svelte/prefer-svelte-reactivity': 'off',
+    },
+  },
 );

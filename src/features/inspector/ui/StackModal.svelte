@@ -11,9 +11,10 @@
   let stackFrames = $derived(GoStackManager.getVirtualStackFrames(stack.stackLo, stack.elemAddr));
 
   let formattedSubtitle = $derived(
-    i18n.t('stackModal.subtitle')
+    i18n
+      .t('stackModal.subtitle')
       .replace('{goid}', String(selectedGoid))
-      .replace('{label}', 'main')
+      .replace('{label}', 'main'),
   );
 </script>
 
@@ -32,7 +33,8 @@
         class="flex items-center justify-between text-xs font-bold text-emerald-400 uppercase tracking-wider"
       >
         <span class="flex items-center gap-2"
-          ><Cpu class="w-4 h-4 text-emerald-400" /> {i18n.t('stackModal.stackArena')} (G{selectedGoid})</span
+          ><Cpu class="w-4 h-4 text-emerald-400" />
+          {i18n.t('stackModal.stackArena')} (G{selectedGoid})</span
         >
         <span class="text-[10px] text-zinc-500">{i18n.t('stackModal.fixedPageSlot')}</span>
       </div>
@@ -76,7 +78,8 @@
           class="flex justify-between items-center bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/40 text-[11px]"
         >
           <span class="text-amber-300 font-bold flex items-center gap-1.5">
-            <Binary class="w-3.5 h-3.5 text-amber-400" /> {i18n.t('stackModal.stackPointer')}:
+            <Binary class="w-3.5 h-3.5 text-amber-400" />
+            {i18n.t('stackModal.stackPointer')}:
           </span>
           <span class="text-amber-300 font-bold">{formatHex(stack.schedSp)}</span>
         </div>

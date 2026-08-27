@@ -28,7 +28,8 @@ export const en: Translations = {
   },
   docs: {
     title: 'Go Runtime Specification',
-    description: 'Internal data structures, memory layout, and runtime invariants of the Go Runtime.',
+    description:
+      'Internal data structures, memory layout, and runtime invariants of the Go Runtime.',
     searchPlaceholder: 'Search structure or field (e.g. hchan, stack, qcount)...',
     memoryLayout: 'Memory Layout',
     keyInvariants: 'Key Invariants',
@@ -76,7 +77,8 @@ export const en: Translations = {
   connector: {
     sudogHeapAddress: 'sudog Heap Address',
     directStackTransferTitle: 'Direct Stack Transfer',
-    directStackTransferDesc: 'Pointer elem points directly to variable in frame stack of {gNode}. Data transfer executed via runtime.memmove without heap allocations.',
+    directStackTransferDesc:
+      'Pointer elem points directly to variable in frame stack of {gNode}. Data transfer executed via runtime.memmove without heap allocations.',
   },
   scheduler: {
     grqTitle: 'GRQ (Global Run Queue)',

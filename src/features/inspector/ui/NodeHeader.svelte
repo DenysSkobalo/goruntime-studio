@@ -1,63 +1,47 @@
 <script lang="ts">
-  import { RUNTIME_DOCS } from '$features/docs/data/runtime-docs';
-  import type { CanvasNodeType } from '$shared/types/nodes';
-  import type { RuntimeDoc } from '$features/docs/data/types';
-  import { ExternalLink, BookOpen, Cpu, Database, Link2 } from '@lucide/svelte';
+  /**
+   * @file NodeHeader.svelte
+   * @description Top header bar for Node Card Inspector.
+   */
+  import { BookOpen, ExternalLink } from '@lucide/svelte';
+  import { i18n } from '$core/i18n';
+  import { handleDocLinkClick } from '$shared/lib/navigation';
 
-  let { nodeType, title = '' }: { nodeType: CanvasNodeType; title?: string } = $props();
+  interface Props {
+    title: string;
+    primitiveId?: 'goroutine' | 'channel' | 'sudog';
+    nodeType?: 'goroutine' | 'channel' | 'sudog';
+    subtitle?: string;
+  }
 
-  const DOC_ID_MAP: Record<CanvasNodeType, string> = {
-    goroutine: 'goroutine',
-    channel: 'channel',
-    mcache: 'mcache',
-    mcentral: 'mcentral',
-    mheap: 'mheap',
-    sudog: 'sudog',
-    p: 'p',
-    m: 'm',
-  };
+  let { title, primitiveId, nodeType, subtitle }: Props = $props();
 
-  let docId = $derived(DOC_ID_MAP[nodeType]);
-  let doc = $derived(docId ? RUNTIME_DOCS.find((d: RuntimeDoc) => d.id === docId) : undefined);
+  let activeId = $derived(primitiveId || nodeType || 'goroutine');
 
-  function openPlatformDocs(id: string) {
-    window.location.hash = `#docs#${id}`;
+  function onSpecClick(e: MouseEvent) {
+    handleDocLinkClick(e, `#docs#${activeId}`);
   }
 </script>
 
-<div class="flex items-center justify-between border-b border-zinc-800 pb-2.5 mb-3 gap-2 w-full">
-  <div class="flex items-center gap-2 min-w-0 flex-1">
-    {#if nodeType === 'goroutine'}
-      <Cpu class="h-4 w-4 shrink-0 text-emerald-400" />
-    {:else if nodeType === 'channel'}
-      <Database class="h-4 w-4 shrink-0 text-cyan-400" />
-    {:else}
-      <Link2 class="h-4 w-4 shrink-0 text-amber-400" />
+<div class="flex items-center justify-between pb-2.5 border-b border-zinc-800 font-mono">
+  <div class="flex items-center gap-2 min-w-0">
+    <h3 class="text-xs font-bold text-zinc-100 truncate">{title}</h3>
+    {#if subtitle}
+      <span class="text-[10px] text-zinc-400 font-medium truncate">({subtitle})</span>
     {/if}
-    <h3 class="text-xs font-bold font-mono text-zinc-100 truncate tracking-tight" {title}>
-      {title}
-    </h3>
   </div>
 
-  {#if doc}
-    {@const currentDoc = doc}
-    <div class="flex items-center gap-1.5 shrink-0">
-      <a
-        href={currentDoc.source.repoUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="inline-flex items-center gap-1 font-mono text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 px-2 py-0.5 rounded border border-zinc-800 transition-all"
-      >
-        <span>{currentDoc.structName}</span>
-        <ExternalLink class="w-3 h-3 text-zinc-500" />
-      </a>
-      <button
-        onclick={() => openPlatformDocs(currentDoc.id)}
-        class="p-1 text-zinc-400 hover:text-sky-400 rounded transition cursor-pointer"
-        title="Open Platform Specification"
-      >
-        <BookOpen class="w-3.5 h-3.5" />
-      </button>
-    </div>
-  {/if}
+  <!-- Header Badge matching global Spec theme -->
+  <a
+    href="#docs#{activeId}"
+    target="_blank"
+    rel="noopener noreferrer"
+    onclick={onSpecClick}
+    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-medium transition cursor-pointer shrink-0"
+    title={i18n.t('docs.platformSpec') || 'Platform Specification'}
+  >
+    <BookOpen class="w-3 h-3 text-purple-400" />
+    <span>Spec</span>
+    <ExternalLink class="w-2.5 h-2.5 text-purple-400/70" />
+  </a>
 </div>

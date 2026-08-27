@@ -1,26 +1,18 @@
 <script lang="ts">
   import { X } from '@lucide/svelte';
-  import type { Snippet } from 'svelte';
+  import type { Snippet, Component } from 'svelte';
 
   interface Props {
     isOpen: boolean;
     title: string;
     subtitle?: string;
-    icon?: any;
+    icon?: Component;
     maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
     onClose: () => void;
     children: Snippet;
   }
 
-  let {
-    isOpen,
-    title,
-    subtitle,
-    icon: Icon,
-    maxWidth = 'md',
-    onClose,
-    children,
-  }: Props = $props();
+  let { isOpen, title, subtitle, icon: Icon, maxWidth = 'md', onClose, children }: Props = $props();
 
   const maxWidthClasses = {
     sm: 'max-w-sm',
@@ -53,10 +45,13 @@
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-mono select-none"
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
     onpointerdown={handleBackdropPointerDown}
   >
     <div
-      class="relative w-full {maxWidthClasses[maxWidth]} bg-[#09090b] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      class="relative w-full {maxWidthClasses[
+        maxWidth
+      ]} bg-[#09090b] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
     >
       <header
         class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-zinc-950/80 shrink-0"

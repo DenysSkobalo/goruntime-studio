@@ -55,7 +55,11 @@ export class GarbageCollector {
   /**
    * Concurrent Mark Phase transition with Write Barrier enablement (Dijkstra/Yuasa hybrid barrier).
    */
-  public startMarkingPhase(roots: string[]): { phase: GCPhase; markedGrey: string[]; explanation: string } {
+  public startMarkingPhase(roots: string[]): {
+    phase: GCPhase;
+    markedGrey: string[];
+    explanation: string;
+  } {
     this.phase = '_GCmark';
     this.writeBarrierEnabled = true;
 
@@ -73,17 +77,22 @@ export class GarbageCollector {
     return {
       phase: this.phase,
       markedGrey,
-      explanation: 'gcStart(): Увімкнено Write Barrier (STW). Перехід до _GCmark. Кореневі посилання (Stack/Globals) позначено сірим (Grey).',
+      explanation:
+        'gcStart(): Увімкнено Write Barrier (STW). Перехід до _GCmark. Кореневі посилання (Stack/Globals) позначено сірим (Grey).',
     };
   }
 
   /**
    * Tri-color marking step (Shade object & scan pointers).
    */
-  public markObject(address: string): { shadedBlack: string; shadedGrey: string[]; explanation: string } {
+  public markObject(address: string): {
+    shadedBlack: string;
+    shadedGrey: string[];
+    explanation: string;
+  } {
     const obj = this.heap.get(address);
     if (!obj || obj.color !== 'grey') {
-      return { shadedBlack: '', shadedGrey: [], explanation: 'Об\'єкт не перебуває у сірій черзі.' };
+      return { shadedBlack: '', shadedGrey: [], explanation: "Об'єкт не перебуває у сірій черзі." };
     }
 
     obj.color = 'black';
@@ -107,7 +116,10 @@ export class GarbageCollector {
   /**
    * Write Barrier hook for pointer manipulation during concurrent mark.
    */
-  public writeBarrier(slotAddr: string, newPtrAddr: string): { shadeTarget: string | null; explanation: string } {
+  public writeBarrier(
+    _slotAddr: string,
+    newPtrAddr: string,
+  ): { shadeTarget: string | null; explanation: string } {
     if (!this.writeBarrierEnabled) {
       return { shadeTarget: null, explanation: 'Write barrier disabled.' };
     }
@@ -121,7 +133,7 @@ export class GarbageCollector {
       };
     }
 
-    return { shadeTarget: null, explanation: 'Об\'єкт вже є сірим або чорним.' };
+    return { shadeTarget: null, explanation: "Об'єкт вже є сірим або чорним." };
   }
 
   /**

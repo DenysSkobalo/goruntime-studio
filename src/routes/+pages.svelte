@@ -4,8 +4,8 @@
   import CanvasViewport from '$features/canvas/ui/CanvasViewport.svelte';
   import InspectorPanel from '$features/inspector/ui/InspectorPanel.svelte';
   import StackModal from '$features/inspector/ui/StackModal.svelte';
-  import SettingsModal from '$features/settings/ui/SettingsModal.svelte';
-  import RuntimeDocsView from '$features/docs/ui/RuntimeDocsView.svelte';
+  import SettingsModal from '$shared/ui/SettingsModal.svelte';
+  import RuntimeDocsView from '$features/docs/ui/DocsView.svelte';
   import { onMount } from 'svelte';
 
   let currentHash = $state(typeof window !== 'undefined' ? window.location.hash : '');

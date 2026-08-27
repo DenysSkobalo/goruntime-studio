@@ -22,7 +22,9 @@
 
   let inspectButtonText = $derived.by(() => {
     if (selectedGoroutine) {
-      return i18n.t('header.inspectStackHeapTarget').replace('{target}', `G${selectedGoroutine.goid}`);
+      return i18n
+        .t('header.inspectStackHeapTarget')
+        .replace('{target}', `G${selectedGoroutine.goid}`);
     }
     return i18n.t('header.inspectStackHeap');
   });
@@ -65,7 +67,9 @@
     </h1>
     <span class="text-zinc-700">/</span>
     <span class="text-xs text-zinc-400 hidden lg:inline-block">
-      {canvasStore.nodes.length} {i18n.t('common.nodes')}, {canvasStore.edges.length} {i18n.t('common.edges')}
+      {canvasStore.nodes.length}
+      {i18n.t('common.nodes')}, {canvasStore.edges.length}
+      {i18n.t('common.edges')}
     </span>
   </div>
 

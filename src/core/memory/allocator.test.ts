@@ -1,24 +1,42 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { GoHeapAllocator } from './allocator';
 
 describe('GoHeapAllocator', () => {
-  it('повертає нульову адресу для size = 0', () => {
-    const allocator = GoHeapAllocator.getInstance();
-    const cache = allocator.createMCache();
-    expect(allocator.allocate(cache, 0)).toBe(0n);
+  let allocator: GoHeapAllocator;
+
+  beforeEach(() => {
+    allocator = GoHeapAllocator.getInstance();
+    allocator.reset();
   });
 
-  it('виділяє малі обʼєкти (<= 32KB) через MCache та MCentral', () => {
-    const allocator = GoHeapAllocator.getInstance();
-    const cache = allocator.createMCache();
-    const addr = allocator.allocate(cache, 64);
-    expect(addr).toBeGreaterThan(0n);
+  it('повертає нульову адресу для size = 0 (zerobase)', () => {
+    const result = allocator.allocate(0);
+    expect(result.address).toBe('0x000000000000');
+    expect(result.level).toBe('tiny');
+    expect(result.explanation).toContain('zerobase');
+  });
+
+  it('використовує Tiny Allocator для обʼєктів розміром <= 16 байтів', () => {
+    const result = allocator.allocate(12);
+    expect(result.level).toBe('tiny');
+    expect(BigInt(result.address)).toBeGreaterThan(0n);
+  });
+
+  it('виділяє малі обʼєкти (>16B та <= 32KB) через MCache', () => {
+    const result = allocator.allocate(64);
+    expect(result.level).toBe('mcache');
+    expect(BigInt(result.address)).toBeGreaterThan(0n);
   });
 
   it('обробляє великі алокації (> 32KB) напряму з MHeap', () => {
-    const allocator = GoHeapAllocator.getInstance();
-    const cache = allocator.createMCache();
-    const addr = allocator.allocate(cache, 40000);
-    expect(addr).toBeGreaterThan(0n);
+    const result = allocator.allocate(40000);
+    expect(result.level).toBe('mheap');
+    expect(BigInt(result.address)).toBeGreaterThan(0n);
+  });
+
+  it('інкрементує адреси памʼяті при послідовних алокаціях', () => {
+    const first = allocator.allocate(32);
+    const second = allocator.allocate(32);
+    expect(BigInt(second.address)).toBeGreaterThan(BigInt(first.address));
   });
 });

@@ -20,17 +20,18 @@ export const uk: Translations = {
     edges: 'зʼєднань',
   },
   header: {
-	  simulate: 'Симуляція',
-	  pause: 'Пауза',
-	  inspectStackHeap: 'Інспектувати Стек та Купу',
-	  inspectStackHeapTarget: 'Інспектувати Стек та Купу ({target})',
-	  clear: 'Очистити полотно',
+    simulate: 'Симуляція',
+    pause: 'Пауза',
+    inspectStackHeap: 'Інспектувати Стек та Купу',
+    inspectStackHeapTarget: 'Інспектувати Стек та Купу ({target})',
+    clear: 'Очистити полотно',
   },
   docs: {
     title: 'Специфікація Go Runtime',
-    description: 'Внутрішня структура даних, компонування пам\'яті та інваріанти виконання Go Runtime.',
+    description:
+      "Внутрішня структура даних, компонування пам'яті та інваріанти виконання Go Runtime.",
     searchPlaceholder: 'Пошук структури або поля (e.g. hchan, stack, qcount)...',
-    memoryLayout: 'Компонування пам\'яті',
+    memoryLayout: "Компонування пам'яті",
     keyInvariants: 'Ключові інваріанти',
     size64Bit: 'Розмір у 64-бітній архітектурі',
     sourceCode: 'Вихідний код',
@@ -52,7 +53,8 @@ export const uk: Translations = {
   inspector: {
     title: 'ІНСПЕКТОР КОМПІЛЯТОРА',
     target: 'Ціль',
-    noSelection: 'Оберіть вузол або зʼєднання на полотні для детального аналізу компонування памʼяті.',
+    noSelection:
+      'Оберіть вузол або зʼєднання на полотні для детального аналізу компонування памʼяті.',
     detailsTab: 'Деталі',
     schedulerTab: 'Планувальник GMP',
     stackArena: 'Арена стека',
@@ -76,7 +78,8 @@ export const uk: Translations = {
   connector: {
     sudogHeapAddress: 'Адреса sudog у Купі',
     directStackTransferTitle: 'Пряма передача через Стек',
-    directStackTransferDesc: 'Вказівник elem вказує безпосередньо на змінну у фреймі стека {gNode}. Передача даних здійснюється викликом runtime.memmove без зайвих алокацій у Heap.',
+    directStackTransferDesc:
+      'Вказівник elem вказує безпосередньо на змінну у фреймі стека {gNode}. Передача даних здійснюється викликом runtime.memmove без зайвих алокацій у Heap.',
   },
   scheduler: {
     grqTitle: 'Глобальна черга виконання (GRQ)',
@@ -101,13 +104,13 @@ export const uk: Translations = {
     sizeClasses: '67 розмірних класів (MCache/MHeap)',
   },
   settingsModal: {
-	  title: 'Налаштування',
-	  subtitle: 'Конфігурація теми та мови інтерфейсу платформи',
-	  themeSection: 'Тема оформлення',
-	  languageSection: 'Мова',
-	  themeLight: 'Світла',
-	  themeDark: 'Темна',
-	  themeSystem: 'Системна',
+    title: 'Налаштування',
+    subtitle: 'Конфігурація теми та мови інтерфейсу платформи',
+    themeSection: 'Тема оформлення',
+    languageSection: 'Мова',
+    themeLight: 'Світла',
+    themeDark: 'Темна',
+    themeSystem: 'Системна',
   },
   analyzer: {
     issuesTitle: 'Аналізатор паралелізму',

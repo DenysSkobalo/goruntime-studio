@@ -111,7 +111,8 @@
         </button>
         <button
           onclick={() => (activeTab = 'scheduler')}
-          class="py-1.5 rounded-md transition font-semibold cursor-pointer {activeTab === 'scheduler'
+          class="py-1.5 rounded-md transition font-semibold cursor-pointer {activeTab ===
+          'scheduler'
             ? 'bg-zinc-800 text-emerald-400'
             : 'text-zinc-400'}"
         >

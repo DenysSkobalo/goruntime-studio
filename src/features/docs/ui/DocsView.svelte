@@ -1,6 +1,11 @@
 <script lang="ts">
+  /**
+   * @file DocsView.svelte
+   * @description Go Runtime specification and documentation viewer.
+   */
   import { onMount } from 'svelte';
   import { i18n } from '$core/i18n';
+  import { settingsStore } from '$shared/stores/settings.store.svelte';
   import { RUNTIME_DOCS } from '../data/runtime-docs';
   import type { LocalizedString } from '../data/types';
   import {
@@ -16,7 +21,9 @@
   } from '@lucide/svelte';
 
   interface Props {
+    /** Callback to navigate back to workspace */
     onBack?: () => void;
+    /** Optional callback to trigger settings modal */
     onOpenSettings?: () => void;
   }
 
@@ -28,6 +35,14 @@
   function getLoc(text: LocalizedString | string): string {
     if (typeof text === 'string') return text;
     return text[i18n.lang] || text.en;
+  }
+
+  function handleOpenSettings() {
+    if (onOpenSettings) {
+      onOpenSettings();
+    } else {
+      settingsStore.setOpen(true);
+    }
   }
 
   function parseHash() {
@@ -75,14 +90,13 @@
 </script>
 
 <div class="min-h-screen bg-[#09090b] text-zinc-100 font-sans flex flex-col">
-  <!-- Top Navigation Header -->
   <header
     class="shrink-0 h-14 border-b border-zinc-800/80 bg-[#09090b]/90 backdrop-blur-md px-4 flex items-center justify-between font-mono sticky top-0 z-30"
   >
     <div class="flex items-center gap-3">
       <button
         onclick={() => (onBack ? onBack() : (window.location.hash = ''))}
-        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition text-xs font-mono font-medium"
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition text-xs font-mono font-medium cursor-pointer"
         title={i18n.t('common.workspace')}
       >
         <ArrowLeft class="w-3.5 h-3.5 text-emerald-400" />
@@ -109,6 +123,14 @@
           class="w-full bg-zinc-900/90 border border-zinc-800 focus:border-purple-500/50 rounded-lg pl-8 pr-3 py-1 text-xs text-zinc-100 outline-none transition font-mono"
         />
       </div>
+
+      <button
+        onclick={handleOpenSettings}
+        class="p-2 text-zinc-400 hover:text-white rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 transition cursor-pointer"
+        title={i18n.t('common.settings')}
+      >
+        <Settings class="w-4 h-4" />
+      </button>
     </div>
   </header>
 
@@ -126,7 +148,7 @@
             activeDocId = doc.id;
             window.location.hash = `#docs#${doc.id}`;
           }}
-          class="w-full text-left p-3 rounded-xl border transition flex items-center gap-3 {isActive
+          class="w-full text-left p-3 rounded-xl border transition flex items-center gap-3 cursor-pointer {isActive
             ? 'bg-purple-500/10 border-purple-500/40 text-purple-300 shadow-lg'
             : 'bg-zinc-900/50 border-zinc-800/80 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}"
         >
@@ -181,7 +203,9 @@
             </div>
           </div>
 
-          <p class="text-xs text-zinc-300 leading-relaxed font-sans">{getLoc(activeDoc.description)}</p>
+          <p class="text-xs text-zinc-300 leading-relaxed font-sans">
+            {getLoc(activeDoc.description)}
+          </p>
 
           <div class="space-y-2 pt-2">
             <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
@@ -210,7 +234,9 @@
 
           <div class="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950">
             <table class="w-full text-left text-xs font-mono">
-              <thead class="bg-zinc-900/80 border-b border-zinc-800 text-zinc-400 text-[10px] uppercase">
+              <thead
+                class="bg-zinc-900/80 border-b border-zinc-800 text-zinc-400 text-[10px] uppercase"
+              >
                 <tr>
                   <th class="py-2.5 px-4 font-semibold">{i18n.t('docs.offset')}</th>
                   <th class="py-2.5 px-4 font-semibold">{i18n.t('docs.field')}</th>
@@ -224,7 +250,9 @@
                     <td class="py-2.5 px-4 text-amber-400 font-bold">{row.offset}</td>
                     <td class="py-2.5 px-4 text-cyan-300 font-bold">{row.field}</td>
                     <td class="py-2.5 px-4 text-purple-300">{row.type}</td>
-                    <td class="py-2.5 px-4 text-zinc-400 text-[11px] font-sans">{getLoc(row.note)}</td>
+                    <td class="py-2.5 px-4 text-zinc-400 text-[11px] font-sans"
+                      >{getLoc(row.note)}</td
+                    >
                   </tr>
                 {/each}
               </tbody>

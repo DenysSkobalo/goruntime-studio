@@ -28,9 +28,9 @@
   <div class="space-y-6 font-mono text-xs">
     <!-- Theme Selection -->
     <div class="space-y-2.5">
-      <label class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+      <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
         {i18n.t('settingsModal.themeSection')}
-      </label>
+      </span>
       <div class="grid grid-cols-3 gap-2.5">
         {#each themes as t}
           {@const Icon = t.icon}
@@ -55,9 +55,9 @@
 
     <!-- Language Selection -->
     <div class="space-y-2.5">
-      <label class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-        {i18n.t('settingsModal.languageSection')}
-      </label>
+      <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+        {i18n.t('settingsModal.themeSection')}
+      </span>
       <div class="grid grid-cols-2 gap-2.5">
         {#each languages as lang}
           {@const isActive = i18n.lang === lang.id}

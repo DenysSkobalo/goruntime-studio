@@ -1,5 +1,3 @@
-import type { Lang } from '$core/i18n/types';
-
 export interface LocalizedString {
   uk: string;
   en: string;

@@ -5,6 +5,7 @@
   import { GO_RUNTIME_LINKS } from '$shared/config/links';
   import NodeHeader from './NodeHeader.svelte';
   import { ArrowLeftRight, Code2, BookOpen, ExternalLink, ChevronRight } from '@lucide/svelte';
+  import { handleDocLinkClick } from '$shared/lib/navigation';
 
   interface Props {
     edge: CanvasEdge;
@@ -27,11 +28,11 @@
   }: Props = $props();
 
   let formattedDesc = $derived(
-    i18n.t('connector.directStackTransferDesc').replace('{gNode}', gNode.label)
+    i18n.t('connector.directStackTransferDesc').replace('{gNode}', gNode.label),
   );
 
-  function openPlatformDocs(id: string) {
-    window.location.hash = `#docs#${id}`;
+  function onSudogClick(e: MouseEvent) {
+    handleDocLinkClick(e, '#docs#sudog');
   }
 </script>
 
@@ -72,33 +73,38 @@
   </div>
 
   <div class="glow-card p-3.5 space-y-2.5 border border-zinc-800 bg-zinc-950/80 rounded-xl">
-	  <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-		{i18n.t('inspector.docAndSpec')}
-	  </span>
-	  <div class="flex flex-col gap-2 w-full">
-		<a
-		  href={GO_RUNTIME_LINKS.GOROUTINE_SPEC}
-		  target="_blank"
-		  rel="noopener noreferrer"
-		  class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-amber-400 text-xs font-semibold transition group"
-		>
-		  <span class="flex items-center gap-2">
-			<Code2 class="w-4 h-4 text-zinc-400 group-hover:text-amber-400" />
-			<span>Go Source (runtime2.go)</span>
-		  </span>
-		  <ExternalLink class="w-3.5 h-3.5 shrink-0 text-zinc-500" />
-		</a>
+    <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+      {i18n.t('inspector.docAndSpec')}
+    </span>
+    <div class="flex flex-col gap-2 w-full">
+      <a
+        href={GO_RUNTIME_LINKS.GOROUTINE_SPEC}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-amber-400 text-xs font-semibold transition group"
+      >
+        <span class="flex items-center gap-2">
+          <Code2 class="w-4 h-4 text-zinc-400 group-hover:text-amber-400" />
+          <span>Go Source (runtime2.go)</span>
+        </span>
+        <ExternalLink class="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+      </a>
 
-		<a
-		  href="#docs#sudog"
-		  class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-amber-950/30 hover:bg-amber-900/50 border border-amber-800/40 text-amber-300 text-xs font-semibold transition cursor-pointer group"
-		>
-		  <span class="flex items-center gap-2">
-			<BookOpen class="w-4 h-4 shrink-0 text-amber-400" />
-			<span>{i18n.t('docs.platformSpec')}</span>
-		  </span>
-		  <ChevronRight class="w-4 h-4 shrink-0 text-amber-500/60 group-hover:translate-x-0.5 transition-transform" />
-		</a>
-	  </div>
+      <a
+        href="#docs#sudog"
+        target="_blank"
+        rel="noopener noreferrer"
+        onclick={onSudogClick}
+        class="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg bg-amber-950/30 hover:bg-amber-900/50 border border-amber-800/40 text-amber-300 text-xs font-semibold transition cursor-pointer group"
+      >
+        <span class="flex items-center gap-2">
+          <BookOpen class="w-4 h-4 shrink-0 text-amber-400" />
+          <span>{i18n.t('docs.platformSpec')}</span>
+        </span>
+        <ChevronRight
+          class="w-4 h-4 shrink-0 text-amber-500/60 group-hover:translate-x-0.5 transition-transform"
+        />
+      </a>
+    </div>
   </div>
 </div>

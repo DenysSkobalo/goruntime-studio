@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import Workspace from '$app/views/Workspace.svelte';
   import DocsView from '$features/docs/ui/DocsView.svelte';
+  import StackModal from '$features/inspector/ui/StackModal.svelte';
+  import SettingsModal from '$shared/ui/SettingsModal.svelte';
 
   type ViewMode = 'workspace' | 'docs';
 
@@ -39,3 +41,7 @@
     <Workspace />
   {/if}
 </div>
+
+<!-- Глобальні модальні вікна, доступні на всіх роутах -->
+<StackModal />
+<SettingsModal />

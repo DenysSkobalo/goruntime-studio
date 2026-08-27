@@ -4,8 +4,6 @@
   import Toolbar from '$features/toolbar/ui/Toolbar.svelte';
   import CanvasView from '$features/canvas/ui/CanvasView.svelte';
   import InspectorPanel from '$features/inspector/ui/InspectorPanel.svelte';
-  import StackModal from '$features/inspector/ui/StackModal.svelte';
-  import SettingsModal from '$shared/ui/SettingsModal.svelte';
   import AnalyzerBanner from '$features/analyzer/ui/AnalyzerBanner.svelte';
   import { timeline } from '$features/inspector/model/timeline.store.svelte';
   import { syncCanvasWithSnapshot } from '$features/canvas/model/sync.bridge';
@@ -35,6 +33,3 @@
     <InspectorPanel />
   </div>
 </div>
-
-<StackModal />
-<SettingsModal />
