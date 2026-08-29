@@ -1,18 +1,84 @@
-# File Naming and Project Commenting Standards
+# Contributing to GoRuntime Studio
 
-## Comment Standard Description and Contributor Instructions
-
-All files in the project's codebase are written in strict compliance with a documentation standard based on **TSDoc / JSDoc**, as well as special navigation anchors (ANCHOR tags).
+Thank you for your interest in GoRuntime Studio! This document provides guidelines and standards to ensure high code quality and a smooth review process.
 
 ---
 
-### 1. Comment Structure in Every File
+## Git Branching Model
 
-Every TypeScript / Svelte file must contain the following 3 levels of commenting:
+We use a two-stage integration model:
 
-#### A. File Header (File Header Module Annotation)
+| Branch                          | Purpose                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `main`                          | Stable production branch. **Direct commits and PRs to `main` are prohibited.**           |
+| `develop`                       | Primary testing and integration branch. **All development PRs must target this branch.** |
+| `feature/<name>` / `fix/<name>` | Individual developer branches created from `develop`.                                    |
 
-Placed at the beginning of every file. Describes the module's purpose, its architectural role, and references to official Go Runtime specification sources.
+```text
+main       -----------------------------------> (Production / Stable Releases)
+               ^
+               | (after successful testing)
+develop    ----+------------+-----------------> (Testing & Integration)
+                \          /
+feature/*        +-- [PR] -+                    (Developer Feature Branches)
+```
+
+### Workflow
+
+1. Create a fresh branch from `develop`:
+
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feature/issue-42-mutex-primitive
+   ```
+
+2. Make changes following our [Code Documentation Standards](#code-documentation-standards).
+
+3. Ensure all automated checks pass locally:
+
+   ```bash
+   make check
+   make lint
+   make test
+   ```
+
+4. Open a Pull Request targeting `develop` using our PR template.
+
+---
+
+## Commit Standards (Conventional Commits)
+
+All commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>(<scope>): <short summary>
+```
+
+### Types
+
+| Type       | Description                           | Example                                            |
+| ---------- | ------------------------------------- | -------------------------------------------------- |
+| `feat`     | New functionality                     | `feat(memory): implement mcentral span allocation` |
+| `fix`      | Bug fix                               | `fix(stack): resolve boundary check calculation`   |
+| `docs`     | Documentation changes                 | `docs(gc): add tri-color mark explanation`         |
+| `refactor` | Code change without functional change | `refactor(canvas): simplify Bezier path math`      |
+| `test`     | Adding or correcting tests            | `test(scheduler): add GRQ starvation test`         |
+| `chore`    | Config, CI, dependency changes        | `chore(ci): add GitHub Actions workflow`           |
+
+### Scopes
+
+Common scopes in this project: `memory`, `gc`, `stack`, `scheduler`, `canvas`, `inspector`, `docs`, `i18n`, `theme`, `ci`, `deps`.
+
+---
+
+## Code Documentation Standards
+
+All TypeScript and Svelte files must strictly comply with a three-level documentation standard based on **TSDoc / JSDoc**, plus structural navigation anchors.
+
+### 1. File Header (Module Annotation)
+
+Placed at the beginning of every file. Describes the module's purpose, architectural role, and references to official Go Runtime specification sources.
 
 ```typescript
 /**
@@ -26,9 +92,14 @@ Placed at the beginning of every file. Describes the module's purpose, its archi
  */
 ```
 
-#### B. Documentation of Methods, Interfaces, and Classes (TSDoc Methods & Types)
+### 2. TSDoc for Methods, Types, and Classes
 
-Every class, method, function, type, and interface is documented with parameters (`@param`), return values (`@returns`), mathematical models (`@remarks`), and internal constraints (`@internal`).
+Every exported class, method, function, type, interface, Svelte `interface Props`, and reactive state (`$state`, `$derived`) must have a TSDoc comment with:
+
+- `@param` — parameter descriptions
+- `@returns` — return value description
+- `@remarks` — mathematical models or architectural notes
+- `@internal` — for implementation details
 
 ```typescript
 /**
@@ -43,56 +114,86 @@ Every class, method, function, type, and interface is documented with parameters
  */
 ```
 
-#### C. Structural and Block Navigation Anchors (ANCHOR: <TAG_NAME>)
+### 3. ANCHOR Tags
 
-Every key data structure, predicate, JSX/Svelte render block, or reactive effect is marked with a unique text tag `ANCHOR: <TAG_NAME>`.
+Every key data structure, predicate, render block, or reactive effect must be marked with a unique text tag:
 
 ```typescript
-// Example in TypeScript/Svelte code:
 /** ANCHOR: GO_HEAP_ALLOCATOR */
 export class GoHeapAllocator { ... }
 ```
 
 ```svelte
-<!-- ANCHOR: STACK_HIGH_BOUNDARY -->
-<div class="flex justify-between items-center...">...</div>
+<!-- ANCHOR: STACK_HIGH_BOUNDARY --><div class="flex justify-between items-center...">...</div>
+```
+
+**Naming convention**: `SCREAMING_SNAKE_CASE`, descriptive and unique across the project.
+
+---
+
+## Navigation & Global Search
+
+Standardized comments enable instant discovery of any structure via IDE global search:
+
+### Search by ANCHOR Tags
+
+| Search                        | Finds                                          |
+| ----------------------------- | ---------------------------------------------- |
+| `ANCHOR: GO_HEAP_ALLOCATOR`   | MCache/MCentral/MHeap allocator implementation |
+| `ANCHOR: TRICOLOR_MARK_START` | Tri-color GC marking phase                     |
+| `ANCHOR: STACK_GUARD_CHECK`   | Stack overflow `stackguard0` check             |
+| `ANCHOR: CONNECTOR_PROPS`     | `sudog` connector component props              |
+| `ANCHOR: HOTKEY_DISPATCHER`   | Global canvas hotkey handler                   |
+
+### Search by TSDoc Annotations
+
+- `@see {@link https://github.com/golang/go` — all implementations referencing Go Runtime source
+- `@module core/memory/*` — core memory subsystem modules
+
+---
+
+## Code Style
+
+- **Formatter**: Prettier with `prettier-plugin-svelte`
+- **Linter**: ESLint with `typescript-eslint` and `eslint-plugin-svelte`
+- **Indent**: 2 spaces, single quotes, trailing commas
+- **Print width**: 100 characters
+- **Strict TypeScript**: `strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`
+
+---
+
+## Testing Requirements
+
+- All new functionality must include unit tests in `.test.ts` files co-located with the source.
+- Use Vitest with jsdom environment.
+- Tests must include ANCHOR tags for major test cases.
+
+```typescript
+/** ANCHOR: TEST_STACK_OVERFLOW */
+it('detects stack overflow when SP approaches stackguard0', () => {
+  // ...
+});
 ```
 
 ---
 
-### 2. Contributor Instructions: How to Write Comments
+## Pull Request Checklist
 
-When adding a new file or modifying an existing one, the contributor is required to:
+Before submitting a PR, verify:
 
-- **Add a File Header**: Specify the exact file path in the `@file` field, the module name in `@module`, a brief description in `@description`, and references to Go Runtime sources in `@see`.
-
-- **Document Types and Functions**: All exported functions, Svelte 5 props (`interface Props`), and reactive states (`$state`, `$derived`) must have a TSDoc comment.
-
-- **Mark ANCHOR Tags**: Every logical block (method, template section, test case) must have a marker `ANCHOR: <UNIQUE_NAME>`.
+- [ ] PR targets the `develop` branch
+- [ ] Commits follow Conventional Commits
+- [ ] All new/modified files have TSDoc File Headers
+- [ ] All exported APIs have `@param` and `@returns`
+- [ ] All logical blocks have `ANCHOR: <TAG_NAME>` markers
+- [ ] `make check` passes (type checking + svelte-check)
+- [ ] `make lint` passes (ESLint)
+- [ ] `make test` passes (Vitest)
+- [ ] `make format-check` passes (Prettier)
+- [ ] Documentation updated if external API changed
 
 ---
 
-### 3. Using Comments and ANCHOR Tags for Project-wide Search
+## Questions?
 
-Using standardized TSDoc comments and ANCHOR tags allows instant discovery of any structure, module, or specific UI fragment via global search in the IDE (Neovim / VS Code / GoLand / WebStorm):
-
-#### Search by ANCHOR Tags (Quick Jump)
-
-To find a specific algorithm, memory element, or UI block, perform a code search by the keyword `ANCHOR:` or the tag name:
-
-**Search for Go memory implementation:**
-
-- `ANCHOR: GO_HEAP_ALLOCATOR` — MCache/MCentral/MHeap allocator implementation (`src/core/memory/allocator.ts`).
-- `ANCHOR: TRICOLOR_MARK_START` — Tricolor GC marking (`src/core/memory/gc.ts`).
-- `ANCHOR: STACK_GUARD_CHECK` — Stack overflow check `stackguard0` (`src/core/memory/stack.ts`).
-
-**Search for inspector interfaces and specifications:**
-
-- `ANCHOR: CONNECTOR_PROPS` — wait list `sudog` component props (`ConnectorInternals.svelte`).
-- `ANCHOR: RUNTIME_DOCS_REGISTRY` — Sticky registry of Go specifications (`runtime-docs.ts`).
-- `ANCHOR: HOTKEY_DISPATCHER` — Global canvas hotkey handler (`CanvasViewport.svelte`).
-
-#### Search by TSDoc Annotations and References (`@see`, `@module`)
-
-- Search for all implementations referencing the original Go Runtime source code: search for the string `@see {@link https://github.com/golang/go`.
-- Search for core modules: search for the string `@module core/memory/*`.
+Open a [Discussion](https://github.com/DenysSkobalo/goruntime-studio/discussions) or reach out in the project's communication channels.
