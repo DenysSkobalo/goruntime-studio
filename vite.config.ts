@@ -15,6 +15,9 @@ export default defineConfig({
       $features: fileURLToPath(new URL('./src/features', import.meta.url)),
       $shared: fileURLToPath(new URL('./src/shared', import.meta.url)),
       $app: fileURLToPath(new URL('./src/app', import.meta.url)),
+      'tsgoruntime-kernel': fileURLToPath(
+        new URL('./src/mocks/tsgoruntime-kernel.ts', import.meta.url),
+      ),
     },
   },
   test: {
