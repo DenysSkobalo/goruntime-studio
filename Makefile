@@ -15,7 +15,7 @@ BUILD_DIR     := dist
 CACHE_DIRS    := .svelte-kit .output .vite
 
 # Declare non-file targets to prevent name collisions with physical files
-.PHONY: dev build preview check lint test format format-check clean help
+.PHONY: dev build preview check lint test format format-check validate ci clean help
 
 # ------------------------------------------------------------------------------
 # DEPENDENCY MANAGEMENT
@@ -66,6 +66,14 @@ format-check: $(NODE_MODULES)
 ## Format source code base using Prettier
 format: $(NODE_MODULES)
 	npm run format
+
+## Run all quality assurance checks sequentially (check, lint, format-check, test)
+validate: check lint format-check test
+	@echo "--> All quality assurance checks passed successfully!"
+
+## Run full local CI pipeline simulation (validate + build)
+ci: validate build
+	@echo "--> Full local CI simulation passed successfully!"
 
 # ------------------------------------------------------------------------------
 # MAINTENANCE & HELP
