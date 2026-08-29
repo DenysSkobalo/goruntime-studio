@@ -12,16 +12,19 @@ SHELL         := /bin/bash
 # Configuration Variables
 NODE_MODULES  := node_modules
 BUILD_DIR     := dist
-CACHE_DIRS    := .svelte-kit .output .vite
+CACHE_DIRS    := .svelte-kit .output .vite coverage
 
 # Declare non-file targets to prevent name collisions with physical files
-.PHONY: dev build preview check lint test format format-check validate ci clean help
+.PHONY: init dev build preview check lint lint-fix test test-coverage test-ui format format-check check-anchors fix validate ci clean help
 
 # ------------------------------------------------------------------------------
 # DEPENDENCY MANAGEMENT
 # ------------------------------------------------------------------------------
 
-## Install dependencies deterministically using package-lock.json
+## Install dependencies deterministically and initialize Git hooks
+init: $(NODE_MODULES)
+	@echo "--> Project environment successfully initialized!"
+
 $(NODE_MODULES): package.json package-lock.json
 	@echo "--> Installing dependencies via npm ci..."
 	npm ci
@@ -55,9 +58,25 @@ check: $(NODE_MODULES)
 lint: $(NODE_MODULES)
 	npm run lint
 
+## Automatically fix ESLint warnings and formatting errors
+lint-fix: $(NODE_MODULES)
+	npm run lint:fix
+
+## Verify uniqueness of ANCHOR tags across source code
+check-anchors: $(NODE_MODULES)
+	npm run check:anchors
+
 ## Execute Vitest unit test suite
 test: $(NODE_MODULES)
 	npm run test:unit
+
+## Run Vitest tests with code coverage report generation
+test-coverage: $(NODE_MODULES)
+	npm run test:coverage
+
+## Launch interactive Vitest graphical UI interface
+test-ui: $(NODE_MODULES)
+	npm run test:ui
 
 ## Verify code formatting compliance with Prettier rules without mutating files
 format-check: $(NODE_MODULES)
@@ -67,8 +86,12 @@ format-check: $(NODE_MODULES)
 format: $(NODE_MODULES)
 	npm run format
 
-## Run all quality assurance checks sequentially (check, lint, format-check, test)
-validate: check lint format-check test
+## Automatically fix code styling (runs Prettier format and ESLint fix)
+fix: format lint-fix
+	@echo "--> Code formatting and lint issues automatically resolved!"
+
+## Run all quality assurance checks sequentially (check, lint, format-check, check-anchors, test)
+validate: check lint format-check check-anchors test
 	@echo "--> All quality assurance checks passed successfully!"
 
 ## Run full local CI pipeline simulation (validate + build)

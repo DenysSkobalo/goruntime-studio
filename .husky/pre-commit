@@ -1,6 +1,8 @@
 #!/bin/sh
 
-echo "--> Executing pre-commit quality checks..."
+echo "--> Checking ANCHOR tags uniqueness..."
+npm run check:anchors
 
+echo "--> Executing pre-commit quality checks..."
 # Run lint-staged for formatted and modified files
 npx lint-staged
