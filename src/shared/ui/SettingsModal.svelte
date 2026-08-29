@@ -70,7 +70,7 @@
     <!-- ANCHOR: LANGUAGE_SELECTION_SECTION -->
     <div class="space-y-2.5">
       <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-        {i18n.t('settingsModal.themeSection')}
+        {i18n.t('settingsModal.languageSection')}
       </span>
       <div class="grid grid-cols-2 gap-2.5">
         {#each languages as lang}
