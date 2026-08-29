@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "--> Validating commit message convention..."
+npx --no-install commitlint --edit "$1"

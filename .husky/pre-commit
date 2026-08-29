@@ -1,0 +1,6 @@
+#!/bin/sh
+
+echo "--> Executing pre-commit quality checks..."
+
+# Run lint-staged for formatted and modified files
+npx lint-staged
